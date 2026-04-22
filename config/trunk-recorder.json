@@ -1,0 +1,61 @@
+{
+  "ver": 2,
+
+  "sources": [
+    {
+      "center":  851000000,
+      "rate":    2400000,
+      "error":   0,
+      "gain":    40,
+      "squelch": -60,
+      "driver":  "osmosdr",
+      "device":  "rtl=serial:TRUNK0",
+      "antenna": "SDR #0 — control channel"
+    },
+    {
+      "center":  856000000,
+      "rate":    2400000,
+      "error":   0,
+      "gain":    40,
+      "squelch": -60,
+      "driver":  "osmosdr",
+      "device":  "rtl=serial:TRUNK1",
+      "antenna": "SDR #1 — voice follow"
+    }
+  ],
+
+  "systems": [
+    {
+      "shortName":            "hamilton-co",
+      "type":                 "p25",
+      "sysId":                "1B6",
+      "control_channel_list": [851412500, 851887500, 852587500],
+      "recordUnknown":        false,
+      "bandplan":             "rebanded800",
+      "talkgroupsFile":       "/app/talkgroups/hamilton-co.csv",
+      "audioArchive":         true,
+      "callTimeout":          3
+    }
+  ],
+
+  "plugins": [
+    {
+      "name":    "MQTT System",
+      "library": "libmqtt_uploader_plugin.so",
+      "broker":  "tcp://mosquitto:1883",
+      "topic":   "jitr",
+      "qos":     0
+    }
+  ],
+
+  "captureDir":   "/app/audio",
+  "logFile":      false,
+  "statusServer": false,
+
+  "_notes": [
+    "device: rtl=serial:TRUNK0 — set with: rtl_eeprom -d 0 -s TRUNK0",
+    "sysId: P25 System ID in hex — find on radioreference.com",
+    "bandplan: rebanded800 for post-reband 800 MHz systems",
+    "MQTT topic 'jitr' must match MQTT_TOPIC_PREFIX in compose.yml"
+  ]
+}

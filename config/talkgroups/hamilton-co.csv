@@ -1,0 +1,11 @@
+Decimal,Alpha Tag,Description,Tag,Group,Mode,Encrypted
+1,DISP-LAW-1,Law Dispatch 1,Law Dispatch,LAW,D,0
+2,DISP-LAW-2,Law Dispatch 2,Law Dispatch,LAW,D,0
+3,DISP-LAW-3,Law Dispatch 3,Law Dispatch,LAW,D,0
+100,FIRE-DISP,Fire Dispatch,Fire Dispatch,FIRE,D,0
+101,FIRE-TAC1,Fire Tac 1,Fire-Tac,FIRE,D,0
+102,FIRE-TAC2,Fire Tac 2,Fire-Tac,FIRE,D,0
+200,EMS-DISP,EMS Dispatch,EMS Dispatch,EMS,D,0
+201,EMS-TAC1,EMS Tac 1,EMS-Tac,EMS,D,0
+300,PW-OPS,Public Works Ops,Public Works,PW,D,0
+400,ADMIN-1,Administration,Admin,ADMIN,D,0

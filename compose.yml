@@ -1,0 +1,101 @@
+name: junk-in-the-trunk
+
+services:
+
+  trunk-recorder:
+    image: ghcr.io/robotastic/trunk-recorder:latest
+    container_name: jitr-decoder
+    privileged: true
+    devices:
+      - /dev/bus/usb
+    volumes:
+      - ./config/trunk-recorder.json:/app/config.json:ro
+      - ./config/talkgroups:/app/talkgroups:ro
+      - audio-data:/app/audio
+    environment:
+      - TZ=${TZ:-America/Indiana/Indianapolis}
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: jitr-mqtt
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mqtt-data:/mosquitto/data
+      - mqtt-log:/mosquitto/log
+    ports:
+      - "127.0.0.1:1883:1883"
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: jitr-db
+    environment:
+      POSTGRES_DB: jitr
+      POSTGRES_USER: jitr
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jitr"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: jitr-api
+    environment:
+      - DATABASE_URL=postgresql://jitr:${DB_PASSWORD}@postgres/jitr
+      - MQTT_URL=mqtt://mosquitto:1883
+      - MQTT_TOPIC_PREFIX=${MQTT_TOPIC_PREFIX:-jitr}
+      - PORT=3000
+      - TZ=${TZ:-America/Indiana/Indianapolis}
+      - NODE_ENV=production
+    volumes:
+      - audio-data:/audio:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:3000}
+    container_name: jitr-ui
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pg-data:
+  mqtt-data:
+  mqtt-log:
+  audio-data:
