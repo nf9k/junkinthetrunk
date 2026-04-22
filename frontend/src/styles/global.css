@@ -41,6 +41,39 @@
 
   --radius:       3px;
   --radius-sm:    2px;
+
+  --scanline-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Day theme — cream/paper background, darker accent dims for contrast.
+   Applied via <html data-theme="day">; the toggle lives in the nav. */
+:root[data-theme="day"] {
+  --bg-base:      #f6f2e8;
+  --bg-surface:   #ffffff;
+  --bg-elevated:  #fbf8f0;
+  --bg-input:     #f0ebdd;
+
+  --border:       #d8d0c0;
+  --border-bright:#b4a890;
+
+  --amber-dim:    #b56500;
+  --amber-glow:   rgba(232, 130, 12, 0.10);
+
+  --green:        #0a9950;
+  --green-dim:    #005e2d;
+  --green-glow:   rgba(10, 153, 80, 0.10);
+
+  --red-dim:      #9a1818;
+  --red-glow:     rgba(200, 40, 40, 0.10);
+
+  --blue-dim:     #0a3d82;
+  --purple-dim:   #5a2090;
+
+  --text-primary: #1a1f28;
+  --text-muted:   #5a5548;
+  --text-dim:     #8a8478;
+
+  --scanline-color: rgba(0, 0, 0, 0.025);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,8 +97,8 @@ body::before {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 0, 0, 0.06) 2px,
-    rgba(0, 0, 0, 0.06) 4px
+    var(--scanline-color) 2px,
+    var(--scanline-color) 4px
   );
   pointer-events: none;
   z-index: 9999;
@@ -662,9 +695,29 @@ body::before {
   animation: pulse-dot 0.8s ease-in-out infinite;
 }
 
-.nav__status { font-family: var(--font-mono); font-size: 11px; flex-shrink: 0; }
+.nav__status {
+  font-family: var(--font-mono); font-size: 11px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 10px;
+}
 .nav__status .green { color: var(--green); }
 .nav__status .dim   { color: var(--text-muted); }
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+  background: var(--amber-glow);
+}
 
 /* ── System selector bar ─────────────────────────────────────────────────────── */
 

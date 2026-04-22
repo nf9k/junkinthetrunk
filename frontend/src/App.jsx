@@ -179,7 +179,7 @@ function Stat({ label, value, alert }) {
 // ── Nav ───────────────────────────────────────────────────────────────────────
 const PAGES = ['Dashboard', 'Call Log', 'Talkgroups', 'Units'];
 
-function Nav({ page, setPage, connected, activeCount, emergencyCount }) {
+function Nav({ page, setPage, connected, activeCount, emergencyCount, theme, toggleTheme }) {
   return (
     <nav className="nav">
       <div className="nav__brand">
@@ -202,6 +202,9 @@ function Nav({ page, setPage, connected, activeCount, emergencyCount }) {
       </div>
 
       <div className="nav__status mono">
+        <button className="theme-toggle mono" onClick={toggleTheme} title="Toggle day / night view">
+          {theme === 'day' ? '☀ DAY' : '☾ NIGHT'}
+        </button>
         <span className={connected ? 'green' : 'dim'}>{connected ? 'LIVE' : 'OFFLINE'}</span>
       </div>
     </nav>
@@ -259,8 +262,15 @@ export default function App() {
   const [units,      setUnits]      = useState([]);
   const [spark,      setSpark]      = useState([]);
   const [audioCallId, setAudioCallId] = useState(null);
+  const [theme, setTheme] = useState(() => localStorage.getItem('jitr-theme') || 'night');
   const sysidRef = useRef(sysid);
   useEffect(() => { sysidRef.current = sysid; }, [sysid]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem('jitr-theme', theme);
+  }, [theme]);
+  const toggleTheme = () => setTheme(t => t === 'day' ? 'night' : 'day');
 
   // ── Socket events ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -417,7 +427,8 @@ export default function App() {
   return (
     <div className="app">
       <Nav page={page} setPage={setPage} connected={connected}
-        activeCount={active.length} emergencyCount={emergency.length} />
+        activeCount={active.length} emergencyCount={emergency.length}
+        theme={theme} toggleTheme={toggleTheme} />
       <SysBar systems={systems} sysid={sysid} setSysid={setSysid} />
       {renderPage()}
       {audioCallId && <AudioBar callId={audioCallId} onClose={() => setAudioCallId(null)} />}
