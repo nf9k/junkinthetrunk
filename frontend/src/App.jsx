@@ -4,10 +4,33 @@ import { io } from 'socket.io-client';
 const API    = import.meta.env.VITE_API_URL || '';
 const socket = io(API, { transports: ['websocket', 'polling'] });
 
+// ── Band plan metadata ────────────────────────────────────────────────────────
+
+const BAND_PLAN_META = {
+  rebanded800:    { label: 'APCO 800 MHz Rebanded', spacing: 25000, fdma: 12500, tdma: 6250, duplex:  45000000, base: 851012500 },
+  '800_standard': { label: 'APCO 800 MHz Standard', spacing: 25000, fdma: 12500, tdma: 6250, duplex:  45000000, base: 851012500 },
+  '900_standard': { label: '900 MHz Standard',       spacing: 12500, fdma: 12500, tdma: null,  duplex: -39000000, base: 935012500 },
+  uhf:            { label: 'UHF',                    spacing: 12500, fdma: 12500, tdma: null,  duplex: null,      base: null      },
+  vhf:            { label: 'VHF',                    spacing: 12500, fdma: 12500, tdma: null,  duplex: null,      base: null      },
+};
+
+const freqToChannel = (hz, bp) =>
+  bp?.base != null ? Math.round((Number(hz) - bp.base) / bp.spacing) : null;
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 const fmtFreq = (hz) => hz ? `${(hz / 1e6).toFixed(4)}` : '—';
 const fmtDur  = (s)  => s != null ? `${parseFloat(s).toFixed(1)}s` : '—';
+
+const freqToTrunk = (hz, sources) => {
+  if (!hz || !sources?.length) return null;
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    if (Math.abs(hz - src.center) <= (src.rate || 0) / 2)
+      return src.device ? src.device.split('=').pop() : `SDR${i}`;
+  }
+  return null;
+};
 const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 const fmtAge  = (ts) => {
   const s = Math.floor((Date.now() - new Date(ts)) / 1000);
@@ -17,14 +40,14 @@ const fmtAge  = (ts) => {
 };
 
 const GROUP_COLOR = (tag) => {
-  if (!tag) return 'var(--amber)';
+  if (!tag) return 'var(--cyan)';
   const t = tag.toLowerCase();
   if (t.includes('fire'))                         return '#ff5c35';
   if (t.includes('ems') || t.includes('medic'))   return '#ff9900';
   if (t.includes('law') || t.includes('police') || t.includes('sheriff')) return '#4a9eff';
   if (t.includes('works') || t.includes('util'))  return '#7ed957';
   if (t.includes('admin') || t.includes('ops'))   return '#c084fc';
-  return 'var(--amber)';
+  return 'var(--cyan)';
 };
 
 const api = async (path) => {
@@ -44,8 +67,9 @@ function Elapsed({ since }) {
 }
 
 // ── Active Call Card ──────────────────────────────────────────────────────────
-function CallCard({ call }) {
+function CallCard({ call, sources }) {
   const color = call.emergency ? 'var(--red)' : call.encrypted ? '#c084fc' : GROUP_COLOR(call.group_tag);
+  const trunk = freqToTrunk(call.freq, sources);
 
   return (
     <div className={`call-card${call.emergency ? ' call-card--emrg' : ''}`}
@@ -71,14 +95,16 @@ function CallCard({ call }) {
 
       <div className="call-card__freq mono">
         {fmtFreq(call.freq)} <span className="dim">MHz</span>
+        {trunk && <span className="trunk-badge">{trunk}</span>}
       </div>
     </div>
   );
 }
 
 // ── Call Log Row ──────────────────────────────────────────────────────────────
-function CallRow({ call, onAudio }) {
+function CallRow({ call, onAudio, sources }) {
   const color = call.emergency ? 'var(--red)' : call.encrypted ? '#c084fc' : GROUP_COLOR(call.group_tag);
+  const trunk = freqToTrunk(call.freq, sources);
   return (
     <tr className="tbl-row">
       <td className="mono dim xs">{fmtTime(call.start_time)}</td>
@@ -89,7 +115,10 @@ function CallRow({ call, onAudio }) {
         <span className="mono dim xs" style={{ marginLeft: 8 }}>{call.tgid}</span>
       </td>
       <td className="mono dim xs">{call.group_tag || '—'}</td>
-      <td className="mono dim xs">{fmtFreq(call.freq)} <span className="dim" style={{fontSize: '0.769rem'}}>MHz</span></td>
+      <td className="mono dim xs">
+        {fmtFreq(call.freq)} <span className="dim" style={{fontSize: '0.769rem'}}>MHz</span>
+        {trunk && <span className="trunk-badge">{trunk}</span>}
+      </td>
       <td className="mono dim xs">{fmtDur(call.duration)}</td>
       <td>
         {call.emergency && <span className="badge badge--emrg">EMRG</span>}
@@ -105,21 +134,28 @@ function CallRow({ call, onAudio }) {
 }
 
 // ── Talkgroup Row ─────────────────────────────────────────────────────────────
-function TGRow({ tg }) {
-  const color = GROUP_COLOR(tg.group_tag);
+function TGRow({ tg, inScan, onToggle, scanActive }) {
+  const color  = GROUP_COLOR(tg.group_tag);
+  const muted  = scanActive && !inScan;
+  const rowCls = `tbl-row tbl-row--clickable${inScan ? ' tbl-row--scanned' : ''}${muted ? ' tbl-row--muted' : ''}`;
   return (
-    <tr className="tbl-row">
+    <tr className={rowCls} onClick={() => onToggle(String(tg.tgid))}>
       <td>
-        <span style={{ color, fontFamily: 'var(--font-display)', fontSize: '1.154rem', letterSpacing: '0.05em' }}>
+        <span style={{ color: muted ? 'var(--text-dim)' : color, fontFamily: 'var(--font-display)', fontSize: '1.154rem', letterSpacing: '0.05em' }}>
           {tg.alpha_tag || `TG ${tg.tgid}`}
         </span>
       </td>
       <td className="mono dim xs">{tg.tgid}</td>
       <td className="mono dim xs">{tg.group_tag || '—'}</td>
       <td className="mono dim xs">{tg.description || '—'}</td>
-      <td className="mono xs" style={{ color: 'var(--amber)' }}>{tg.call_count || 0}</td>
+      <td className="mono xs" style={{ color: muted ? 'var(--text-dim)' : 'var(--cyan)' }}>{tg.call_count || 0}</td>
       <td className="mono dim xs">{tg.last_active ? fmtTime(tg.last_active) : '—'}</td>
-      <td>{tg.encrypted && <span className="badge badge--enc">ENC</span>}</td>
+      <td>
+        <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+          {tg.encrypted && <span className="badge badge--enc">ENC</span>}
+          {inScan && <span style={{ color: 'var(--green)', fontSize: '0.769rem' }}>●</span>}
+        </span>
+      </td>
     </tr>
   );
 }
@@ -128,11 +164,11 @@ function TGRow({ tg }) {
 function UnitRow({ unit }) {
   return (
     <tr className="tbl-row">
-      <td className="mono" style={{ color: 'var(--amber)', fontSize: '1rem' }}>{unit.unit_id}</td>
+      <td className="mono" style={{ color: 'var(--cyan)', fontSize: '1rem' }}>{unit.unit_id}</td>
       <td className="mono dim xs">{unit.last_tg_name || unit.last_tgid || '—'}</td>
       <td className="mono dim xs">{unit.group_tag || '—'}</td>
       <td className="mono dim xs">{fmtFreq(unit.last_freq)} {unit.last_freq ? <span style={{fontSize: '0.769rem'}}>MHz</span> : ''}</td>
-      <td className="mono xs" style={{ color: 'var(--amber)' }}>{unit.call_count || 0}</td>
+      <td className="mono xs" style={{ color: 'var(--cyan)' }}>{unit.call_count || 0}</td>
       <td className="mono dim xs">{fmtTime(unit.last_seen)}</td>
     </tr>
   );
@@ -258,9 +294,20 @@ function Tbl({ cols, children, empty }) {
 
 // ── Site Info page ────────────────────────────────────────────────────────────
 
-function SiteCard({ site, isCurrent }) {
-  const ctrl = site.control_freqs || [];
-  const voice = site.voice_freqs || [];
+function SiteCard({ site, isCurrent, bp }) {
+  const ctrl  = site.control_freqs || [];
+  const voice = site.voice_freqs   || [];
+
+  const FreqChip = ({ hz, isCtrl, primary }) => {
+    const ch = freqToChannel(hz, bp);
+    return (
+      <span className={`freq-chip${isCtrl ? ' freq-chip--ctrl' : ''}${primary ? ' freq-chip--primary' : ''}`}>
+        <span>{fmtFreq(hz)}</span>
+        {ch != null && <span className="chip-ch">ch {ch}</span>}
+      </span>
+    );
+  };
+
   return (
     <div className={`site-card${isCurrent ? ' site-card--current' : ''}`}>
       <div className="site-card__header">
@@ -286,24 +333,15 @@ function SiteCard({ site, isCurrent }) {
       </div>
 
       <div className="site-card__channels">
-        <div className="site-card__channels-label mono dim xs">
-          CONTROL · {ctrl.length}
-        </div>
+        <div className="site-card__channels-label mono dim xs">CONTROL · {ctrl.length}</div>
         <div className="freq-chips">
-          {ctrl.map((hz, i) => (
-            <span key={hz} className={`freq-chip freq-chip--ctrl${i === 0 ? ' freq-chip--primary' : ''}`}>
-              {fmtFreq(hz)}
-            </span>
-          ))}
+          {ctrl.map((hz, i) => <FreqChip key={hz} hz={hz} isCtrl primary={i === 0} />)}
         </div>
-
         <div className="site-card__channels-label mono dim xs" style={{ marginTop: 8 }}>
           VOICE · {voice.length}
         </div>
         <div className="freq-chips">
-          {voice.map(hz => (
-            <span key={hz} className="freq-chip">{fmtFreq(hz)}</span>
-          ))}
+          {voice.map(hz => <FreqChip key={hz} hz={hz} />)}
         </div>
       </div>
     </div>
@@ -319,6 +357,7 @@ function SiteInfoPage({ detail }) {
   const recorders = detail.recorders_json   || [];
   const activeRec = recorders.filter(r => r.rec_state_type && r.rec_state_type !== 'IDLE' && r.rec_state_type !== 'AVAILABLE');
   const currentSite = detail.current_site_id;
+  const bp = BAND_PLAN_META[detail.bandplan] || null;
 
   // Group sites by RFSS for display
   const byRfss = {};
@@ -342,6 +381,23 @@ function SiteInfoPage({ detail }) {
         <Stat label="DECODE RATE"  value={detail.current_decode_rate != null ? `${Number(detail.current_decode_rate).toFixed(1)}/s` : '—'} />
         <Stat label="SQUELCH"      value={detail.squelch_db != null ? `${detail.squelch_db} dB` : '—'} />
       </div>
+
+      {/* Band Plan */}
+      {detail.bandplan && (
+        <>
+          <div className="section-label mono" style={{ marginTop: 24 }}>BAND PLAN</div>
+          <div className="bandplan-card mono">
+            <div className="bandplan-title">{bp?.label || detail.bandplan}</div>
+            <div className="bandplan-params">
+              <div><span className="dim xs">CHANNEL SPACING</span><span>{bp ? `${bp.spacing / 1000} kHz` : '—'}</span></div>
+              <div><span className="dim xs">FDMA WIDTH</span><span>{bp ? `${bp.fdma / 1000} kHz` : '—'}</span></div>
+              {bp?.tdma && <div><span className="dim xs">TDMA SLOT (PHASE 2)</span><span>{bp.tdma / 1000} kHz · 2 slots/ch</span></div>}
+              {bp?.duplex != null && <div><span className="dim xs">DUPLEX OFFSET</span><span>{bp.duplex > 0 ? '+' : ''}{bp.duplex / 1e6} MHz</span></div>}
+              {bp?.base && <div><span className="dim xs">BASE (MOBILE TX)</span><span>{(bp.base / 1e6).toFixed(4)} MHz</span></div>}
+            </div>
+          </div>
+        </>
+      )}
 
       {/* SDR sources */}
       <div className="section-label mono" style={{ marginTop: 24 }}>
@@ -411,7 +467,7 @@ function SiteInfoPage({ detail }) {
           <div className="site-grid">
             {byRfss[rfssId].map(site => (
               <SiteCard key={site.id} site={site}
-                isCurrent={currentSite === site.site_id} />
+                isCurrent={currentSite === site.site_id} bp={bp} />
             ))}
           </div>
         </div>
@@ -435,6 +491,13 @@ export default function App() {
   const [audioCallId, setAudioCallId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('jitr-theme') || 'night');
   const [fontSize, setFontSize] = useState(() => localStorage.getItem('jitr-font-size') || 'normal');
+  const [scanList, setScanList] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('jitr-scan-list') || '[]')); }
+    catch { return new Set(); }
+  });
+  const [tgSearch,      setTgSearch]      = useState('');
+  const [tgGroupFilter, setTgGroupFilter] = useState('');
+  const [tgActiveOnly,  setTgActiveOnly]  = useState(true);
   const sysidRef = useRef(sysid);
   useEffect(() => { sysidRef.current = sysid; }, [sysid]);
 
@@ -443,6 +506,14 @@ export default function App() {
     localStorage.setItem('jitr-theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(t => t === 'day' ? 'night' : 'day');
+
+  useEffect(() => {
+    localStorage.setItem('jitr-scan-list', JSON.stringify([...scanList]));
+  }, [scanList]);
+  const toggleScan = useCallback((tgid) => {
+    setScanList(prev => { const n = new Set(prev); n.has(tgid) ? n.delete(tgid) : n.add(tgid); return n; });
+  }, []);
+  const clearScan = useCallback(() => setScanList(new Set()), []);
 
   useEffect(() => {
     document.documentElement.dataset.fontSize = fontSize;
@@ -470,13 +541,17 @@ export default function App() {
 
     socket.on('call:end', ({ sysid: sid, tgid }) => {
       setActive(prev => prev.filter(c => !(c.sysid === sid && c.tgid === tgid)));
-      // Silently refresh call log if we're on that page
+      if (sysidRef.current) fetchCalls(sysidRef.current);
+    });
+
+    socket.on('calls:updated', () => {
       if (sysidRef.current) fetchCalls(sysidRef.current);
     });
 
     return () => {
       socket.off('connect'); socket.off('disconnect');
       socket.off('active:snapshot'); socket.off('call:start'); socket.off('call:end');
+      socket.off('calls:updated');
     };
   }, []);
 
@@ -516,15 +591,24 @@ export default function App() {
     return () => clearInterval(t);
   }, [fetchSystems]);
 
+  // Clear TG filters when system changes
+  const prevSysidRef = useRef(null);
+  useEffect(() => {
+    if (sysid && sysid !== prevSysidRef.current) {
+      setTgSearch(''); setTgGroupFilter('');
+      prevSysidRef.current = sysid;
+    }
+  }, [sysid]);
+
   // Load data when system or page changes
   useEffect(() => {
     if (!sysid) return;
     fetchSpark(sysid);
+    fetchSysDetail(sysid);
     if (page === 'Dashboard')  fetchCalls(sysid);
     if (page === 'Call Log')   fetchCalls(sysid);
     if (page === 'Talkgroups') fetchTalkgroups(sysid);
     if (page === 'Units')      fetchUnits(sysid);
-    if (page === 'Site Info')  fetchSysDetail(sysid);
   }, [sysid, page]);
 
   // Site Info realtime fields (current CC, decode rate, recorders) — poll every 3s.
@@ -536,7 +620,9 @@ export default function App() {
 
   const sys          = systems.find(s => s.sysid === sysid);
   const emergency    = active.filter(c => c.emergency);
-  const sortedActive = [...active].sort((a, b) => (b.emergency ? 1 : 0) - (a.emergency ? 1 : 0));
+  const visibleActive = scanList.size > 0 ? active.filter(c => scanList.has(String(c.tgid))) : active;
+  const visibleCalls  = scanList.size > 0 ? calls.filter(c => scanList.has(String(c.tgid)))  : calls;
+  const sortedActive  = [...visibleActive].sort((a, b) => (b.emergency ? 1 : 0) - (a.emergency ? 1 : 0));
 
   // ── Render pages ──────────────────────────────────────────────────────────
   const renderPage = () => {
@@ -557,22 +643,23 @@ export default function App() {
 
           {/* Active calls */}
           <div className="section-label mono">ACTIVE CALLS
-            {active.length > 0 && <span className="section-count">{active.length}</span>}
+            {visibleActive.length > 0 && <span className="section-count">{visibleActive.length}</span>}
+            {scanList.size > 0 && <span className="section-count" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>SCAN {scanList.size}</span>}
           </div>
-          {active.length === 0 ? (
+          {sortedActive.length === 0 ? (
             <div className="scanning mono dim">— SCANNING —</div>
           ) : (
             <div className="card-grid">
-              {sortedActive.map(c => <CallCard key={`${c.sysid}-${c.tgid}`} call={c} />)}
+              {sortedActive.map(c => <CallCard key={`${c.sysid}-${c.tgid}`} call={c} sources={sysDetail?.sdr_sources_json} />)}
             </div>
           )}
 
           {/* Recent calls */}
           <div className="section-label mono" style={{ marginTop: 32 }}>RECENT CALLS</div>
           <Tbl cols={['Time', 'Talkgroup', 'Group', 'Freq', 'Dur', 'Flags', '']}
-            empty={calls.length === 0 ? 'no calls recorded' : null}>
-            {calls.slice(0, 50).map(c =>
-              <CallRow key={c.id} call={c} onAudio={setAudioCallId} />
+            empty={visibleCalls.length === 0 ? 'no calls recorded' : null}>
+            {visibleCalls.slice(0, 50).map(c =>
+              <CallRow key={c.id} call={c} onAudio={setAudioCallId} sources={sysDetail?.sdr_sources_json} />
             )}
           </Tbl>
         </div>
@@ -581,26 +668,77 @@ export default function App() {
       case 'Call Log': return (
         <div className="page">
           <div className="section-label mono">CALL LOG
-            <span className="section-count">{calls.length}</span>
+            <span className="section-count">{visibleCalls.length}</span>
+            {scanList.size > 0 && <span className="section-count" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>SCAN {scanList.size}</span>}
           </div>
           <Tbl cols={['Time', 'Talkgroup', 'Group', 'Freq', 'Dur', 'Flags', '']}
-            empty={calls.length === 0 ? 'no calls recorded' : null}>
-            {calls.map(c => <CallRow key={c.id} call={c} onAudio={setAudioCallId} />)}
+            empty={visibleCalls.length === 0 ? 'no calls recorded' : null}>
+            {visibleCalls.map(c => <CallRow key={c.id} call={c} onAudio={setAudioCallId} sources={sysDetail?.sdr_sources_json} />)}
           </Tbl>
         </div>
       );
 
-      case 'Talkgroups': return (
-        <div className="page">
-          <div className="section-label mono">TALKGROUPS
-            <span className="section-count">{talkgroups.length}</span>
+      case 'Talkgroups': {
+        const activeTGs = tgActiveOnly ? talkgroups.filter(t => t.call_count > 0) : talkgroups;
+        const groups    = [...new Set(activeTGs.map(t => t.group_tag).filter(Boolean))].sort();
+        const srch      = tgSearch.toLowerCase();
+        const visibleTGs = activeTGs.filter(t => {
+          if (tgGroupFilter && t.group_tag !== tgGroupFilter) return false;
+          if (srch && !(
+            (t.alpha_tag   || '').toLowerCase().includes(srch) ||
+            (t.description || '').toLowerCase().includes(srch) ||
+            String(t.tgid).includes(srch)
+          )) return false;
+          return true;
+        });
+        return (
+          <div className="page">
+            <div className="section-label mono" style={{ marginBottom: 8 }}>TALKGROUPS
+              <span className="section-count">{visibleTGs.length}/{talkgroups.length}</span>
+              {scanList.size > 0 && (
+                <>
+                  <span className="section-count" style={{ background: 'var(--green-dim)', color: 'var(--green)' }}>
+                    {scanList.size} scanning
+                  </span>
+                  <button className="btn btn-ghost" style={{ marginLeft: 8, padding: '1px 8px', fontSize: '0.692rem' }}
+                    onClick={clearScan}>CLEAR SCAN</button>
+                </>
+              )}
+            </div>
+            <div className="toolbar" style={{ marginBottom: 10 }}>
+              <input className="input-field" placeholder="Search name / TGID…"
+                value={tgSearch} onChange={e => setTgSearch(e.target.value)}
+                style={{ minWidth: 180 }} />
+              <select className="input-field" value={tgGroupFilter}
+                onChange={e => setTgGroupFilter(e.target.value)}>
+                <option value="">All groups</option>
+                {groups.map(g => <option key={g} value={g}>{g}</option>)}
+              </select>
+              <button className={`btn ${tgActiveOnly ? 'btn-active' : 'btn-ghost'}`}
+                onClick={() => { setTgActiveOnly(v => !v); setTgGroupFilter(''); }}>
+                ACTIVE ONLY
+              </button>
+              {(tgSearch || tgGroupFilter) && (
+                <button className="btn btn-ghost" onClick={() => { setTgSearch(''); setTgGroupFilter(''); }}>
+                  CLEAR
+                </button>
+              )}
+            </div>
+            {scanList.size === 0 && (
+              <div className="mono dim xs" style={{ marginBottom: 8 }}>Click a row to add it to your scan list — unselected talkgroups will be muted everywhere.</div>
+            )}
+            <Tbl cols={['Name', 'TGID', 'Group', 'Description', 'Calls', 'Last Active', '']}
+              empty={talkgroups.length === 0 ? 'no talkgroups — import a CSV via API' : visibleTGs.length === 0 ? 'no matches' : null}>
+              {visibleTGs.map(t => (
+                <TGRow key={t.id} tg={t}
+                  inScan={scanList.has(String(t.tgid))}
+                  onToggle={toggleScan}
+                  scanActive={scanList.size > 0} />
+              ))}
+            </Tbl>
           </div>
-          <Tbl cols={['Name', 'TGID', 'Group', 'Description', 'Calls', 'Last Active', '']}
-            empty={talkgroups.length === 0 ? 'no talkgroups — import a CSV via API' : null}>
-            {talkgroups.map(t => <TGRow key={t.id} tg={t} />)}
-          </Tbl>
-        </div>
-      );
+        );
+      }
 
       case 'Units': return (
         <div className="page">

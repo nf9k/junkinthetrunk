@@ -1,0 +1,242 @@
+From: Bill Atkinson <bill.atkinson@gmail.com>
+Date: Tue, 22 Apr 2026 00:00:00 +0000
+Subject: [PATCH] Enable P25 ARC4/ADP decryption
+
+Four coordinated changes enable end-to-end ARC4 (ADP, algid 0xaa) decryption:
+
+1. trunk-recorder/recorders/p25_recorder_decode.cc
+   flip do_nocrypt 1→0 so the frame assembler attempts decryption
+
+2. trunk-recorder/call_concluder/call_concluder.cc
+   remove the early return + file delete for encrypted calls so that
+   successfully decrypted calls fall through to normal audio processing
+
+3. Key registration plumbing (four files):
+   - trunk-recorder/systems/system_impl.h: add crypt_key_t struct +
+     crypt_keys vector + add_crypt_key() inline on System_impl
+   - trunk-recorder/config.cc: parse "keys":[{"keyid":N,"algid":N,
+     "key":"hexstring"},...] in the per-system JSON block and call
+     system->add_crypt_key()
+   - trunk-recorder/recorders/p25_recorder_impl.cc: at call start,
+     cast System* to System_impl, iterate crypt_keys, push each key
+     into both decode blocks via crypt_key()
+   - trunk-recorder/recorders/p25_recorder_decode.h/.cc: add
+     crypt_key() shim that delegates to op25_frame_assembler->crypt_key()
+   - lib/op25_repeater/lib/p25_frame_assembler_impl.h/.cc: override the
+     empty virtual crypt_key() and crypt_reset() to forward into p1fdma
+     and p2tdma
+
+4. lib/op25_repeater/lib/p25p1_fdma.cc
+   In the encrypted voice path, add an "else if (audio_valid)" branch
+   that routes decrypted IMBE codewords through the software vocoder
+   instead of pushing silence frames. The original silence path is
+   kept for the case where no matching key was found (audio_valid=false).
+
+Config example:
+  "systems": [{
+    "shortName": "MESA",
+    ...
+    "keys": [
+      {"keyid": 1, "algid": 170, "key": "AABBCCDDEE"}
+    ]
+  }]
+  (algid 170 == 0xaa == ADP RC4)
+
+---
+--- a/trunk-recorder/recorders/p25_recorder_decode.cc
++++ b/trunk-recorder/recorders/p25_recorder_decode.cc
+@@ -99,7 +99,7 @@
+   bool do_msgq = 1;
+   bool do_audio_output = 1;
+   bool do_tdma = 0;
+-  bool do_nocrypt = 1;
++  bool do_nocrypt = 0;
+ 
+   op25_frame_assembler = gr::op25_repeater::p25_frame_assembler::make(silence_frames, d_soft_vocoder, udp_host, udp_port, verbosity, do_imbe, do_output, do_msgq, rx_queue, do_audio_output, do_tdma, do_nocrypt);
+   op25_frame_assembler->set_voice_codec_callback(voice_codec_cb_handler, this);
+@@ -157,6 +157,10 @@
+   return op25_frame_assembler;
+ }
+ 
++void p25_recorder_decode::crypt_key(uint16_t keyid, uint8_t algid, const std::vector<uint8_t> &key) {
++  op25_frame_assembler->crypt_key(keyid, algid, key);
++}
++
+ void p25_recorder_decode::handle_alias_message(const nlohmann::json& j) {
+   int messages = j.contains("messages") ? j["messages"].get<int>() : 0;
+   std::array<std::vector<uint8_t>, 10> alias_buffer;
+--- a/trunk-recorder/recorders/p25_recorder_decode.h
++++ b/trunk-recorder/recorders/p25_recorder_decode.h
+@@ -74,6 +74,7 @@
+   State get_state();
+   gr::op25_repeater::p25_frame_assembler::sptr get_transmission_sink();
+   void check_message_queue();
++  void crypt_key(uint16_t keyid, uint8_t algid, const std::vector<uint8_t> &key);
+ 
+ private:
+   void handle_alias_message(const nlohmann::json& j);
+--- a/lib/op25_repeater/lib/p25_frame_assembler_impl.h
++++ b/lib/op25_repeater/lib/p25_frame_assembler_impl.h
+@@ -91,6 +91,8 @@
+       void clear_silence_frame_count();
+       void clear();
+       void set_voice_codec_callback(voice_codec_cb_t cb, void *user_data);
++      void crypt_key(uint16_t keyid, uint8_t algid, const std::vector<uint8_t> &key);
++      void crypt_reset(void);
+       log_ts logts;
+     };
+ 
+--- a/lib/op25_repeater/lib/p25_frame_assembler_impl.cc
++++ b/lib/op25_repeater/lib/p25_frame_assembler_impl.cc
+@@ -145,6 +145,16 @@
+       p2tdma.set_voice_codec_callback(cb, user_data);
+     }
+ 
++    void p25_frame_assembler_impl::crypt_key(uint16_t keyid, uint8_t algid, const std::vector<uint8_t> &key) {
++      p1fdma.crypt_key(keyid, algid, key);
++      p2tdma.crypt_key(keyid, algid, key);
++    }
++
++    void p25_frame_assembler_impl::crypt_reset(void) {
++      p1fdma.crypt_reset();
++      p2tdma.crypt_reset();
++    }
++
+ void p25_frame_assembler_impl::send_grp_src_id() {
+           long tdma_src_id = -1;
+           long tdma_grp_id = -1;
+--- a/trunk-recorder/systems/system_impl.h
++++ b/trunk-recorder/systems/system_impl.h
+@@ -25,6 +25,7 @@
+ #endif
+ 
+ #include <boost/property_tree/ptree.hpp>
++#include <cstdint>
+ 
+ class Source;
+ class analog_recorder;
+@@ -125,6 +126,17 @@
+ 
+   std::map<unsigned long, std::map<unsigned long, std::time_t>> talkgroup_patches;
+ 
++  // Per-system ARC4/ADP decryption keys loaded from config "keys" array
++  struct crypt_key_t {
++    uint16_t keyid;
++    uint8_t  algid;
++    std::vector<uint8_t> key;
++  };
++  std::vector<crypt_key_t> crypt_keys;
++  void add_crypt_key(uint16_t keyid, uint8_t algid, const std::vector<uint8_t> &key) {
++    crypt_keys.push_back({keyid, algid, key});
++  }
++
+   std::string get_short_name() override;
+   void set_short_name(std::string short_name) override;
+   std::string get_upload_script() override;
+--- a/trunk-recorder/config.cc
++++ b/trunk-recorder/config.cc
+@@ -6,3 +6,4 @@
+ #include "./config.h"
++#include "systems/system_impl.h"
+
+ using json = nlohmann::json;
+@@ -511,6 +512,27 @@
+         BOOST_LOG_TRIVIAL(info) << "Hide Encrypted Talkgroups: " << system->get_hideEncrypted();
+         system->set_monitorEncrypted(element.value("monitorEncrypted", system->get_monitorEncrypted()));
+         BOOST_LOG_TRIVIAL(info) << "Monitor Encrypted Calls: " << system->get_monitorEncrypted();
++
++        if (element.contains("keys") && element["keys"].is_array()) {
++          for (const auto &k : element["keys"]) {
++            if (!k.contains("keyid") || !k.contains("algid") || !k.contains("key"))
++              continue;
++            uint16_t keyid = k["keyid"].get<uint16_t>();
++            uint8_t  algid = k["algid"].get<uint8_t>();
++            std::string hex = k["key"].get<std::string>();
++            std::vector<uint8_t> key_bytes;
++            for (size_t i = 0; i + 1 < hex.size(); i += 2) {
++              key_bytes.push_back(static_cast<uint8_t>(std::stoul(hex.substr(i, 2), nullptr, 16)));
++            }
++            System_impl *sys_impl = dynamic_cast<System_impl *>(system);
++            if (sys_impl) {
++              sys_impl->add_crypt_key(keyid, algid, key_bytes);
++              BOOST_LOG_TRIVIAL(info) << "[" << system->get_short_name() << "] Registered decrypt key: keyid=0x"
++                                      << std::hex << keyid << " algid=0x" << (int)algid << std::dec;
++            }
++          }
++        }
++
+         system->set_hideUnknown(element.value("hideUnknownTalkgroups", system->get_hideUnknown()));
+         BOOST_LOG_TRIVIAL(info) << "Hide Unknown Talkgroups: " << system->get_hideUnknown();
+         system->set_min_duration(element.value("minDuration", 0.0));
+--- a/trunk-recorder/recorders/p25_recorder_impl.cc
++++ b/trunk-recorder/recorders/p25_recorder_impl.cc
+@@ -2,6 +2,7 @@
+ #include "p25_recorder_impl.h"
+ #include "../formatter.h"
+ #include "p25_recorder.h"
++#include "../systems/system_impl.h"
+ #include <boost/log/trivial.hpp>
+ 
+ p25_recorder_sptr make_p25_recorder(Source *src, Recorder_Type type) {
+@@ -353,6 +354,16 @@
+       modulation_selector->set_output_index(0);
+       fsk4_p25_decode->start(call);
+     }
++
++    // Push per-system decryption keys into both decode blocks
++    System_impl *sys_impl = dynamic_cast<System_impl *>(system);
++    if (sys_impl) {
++      for (const auto &k : sys_impl->crypt_keys) {
++        qpsk_p25_decode->crypt_key(k.keyid, k.algid, k.key);
++        fsk4_p25_decode->crypt_key(k.keyid, k.algid, k.key);
++      }
++    }
++
+     state = ACTIVE;
+ 
+     if (conventional) {
+--- a/lib/op25_repeater/lib/p25p1_fdma.cc
++++ b/lib/op25_repeater/lib/p25p1_fdma.cc
+@@ -927,8 +927,27 @@
+                                     output_queue.push_back(snd[i]);
+                                 }
+                             }
++                        } else if (audio_valid) {
++                            // Decryption succeeded — route through vocoder like unencrypted audio
++                            if (d_soft_vocoder) {
++                                software_decoder.decode_fullrate(snd, u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], E0, ET);
++                            } else {
++                                int16_t frame_vector[8];
++                                for (int i=0; i < 8; i++) {
++                                    frame_vector[i] = u[i] & 0xFFFF;
++                                }
++                                frame_vector[7] >>= 1;
++                                vocoder.imbe_decode(frame_vector, snd);
++                            }
++                            if (op25audio.enabled()) {
++                                op25audio.send_audio(snd, SND_FRAME * sizeof(int16_t));
++                            } else {
++                                for (int i = 0; i < SND_FRAME; i++) {
++                                    output_queue.push_back(snd[i]);
++                                }
++                            }
+                         } else {
+-		                    // For encrypted voice without a valid key, push silent audio frames
++                            // Encrypted, no valid key — push silent audio frames
+                             // If monitoring for metadata, this will allow tags to pass and preserve call flow
+                             if (!op25audio.enabled()) {
+                                 for (int i = 0; i < SND_FRAME; i++) {
+--- a/trunk-recorder/call_concluder/call_concluder.cc
++++ b/trunk-recorder/call_concluder/call_concluder.cc
+@@ -1210,11 +1210,9 @@
+   if (call_info.encrypted) {
+     if (!call_info.transmission_list.empty() || call_info.min_transmissions_removed > 0) {
+       if (create_call_json(call_info) < 0)
+         BOOST_LOG_TRIVIAL(error) << loghdr
+             << "\033[0;31mFailed to create metadata JSON for encrypted call\033[0m";
+     }
+-    remove_call_files(call_info);
+-    return;
+   }
+
+   if (call_info.transmission_list.empty()) {

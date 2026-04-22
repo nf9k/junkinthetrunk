@@ -47,7 +47,7 @@ A P25 trunked system is a network of radios that shares a small pool of RF chann
 
 - Not a broadcast-audio streamer. There's a built-in audio player for recorded calls, but no live-listen path (by design — simpler, lower load).
 - Not an OpenMHz / Broadcastify uploader. Those plugins are bundled in the decoder image but disabled by default; configure `trunk-recorder.json` manually if you want them.
-- Not a decryptor. P25 AES/DES encryption is intact; you see the metadata and nothing more for encrypted calls.
+- Supports ARC4/ADP (Motorola algid `0xAA`, 40-bit) decryption when keys are configured in `config/keys.json`. AES-256 and DES-OFB encrypted calls record metadata only — you see the talkgroup, unit IDs, and frequency but not the audio.
 
 \newpage
 
@@ -183,41 +183,48 @@ RadioReference premium data is subscriber-licensed. The repo's `.gitignore` excl
 
 ## Encrypted voice (authorized use only)
 
-trunk-recorder supports an optional `keys[]` array on each system, used only when you have legitimate authorization to receive and decode a system's encrypted traffic — e.g. you administer the radio system or are acting under explicit permission of whoever does. Skip this section otherwise.
+ARC4/ADP (Motorola algid `0xAA`, 40-bit) decryption is supported when you have legitimate authorization — e.g. you administer the radio system or operate under explicit permission. Skip this section otherwise.
 
-The shape is generic:
+### How it works
+
+The upstream `trunk-recorder` binary has decryption disabled at compile time. This stack applies `patches/arc4-decrypt.patch` during the Docker build to re-enable it, and `decoder/entrypoint.sh` merges your key file into the runtime config via `jq` at container start.
+
+### Key configuration
+
+Create `config/keys.json` (gitignored — never commit it):
 
 ```json
-{
-  "shortName": "<your sysid>",
-  "sysId": <sysid-decimal>,
-  "...": "...",
-  "keys": [
-    { "keyid": <kid>, "algid": <algid>, "key": "<hex>" }
-  ]
-}
+[
+  { "keyid": 1, "algid": 170, "key": "AABBCCDDEE" }
+]
 ```
 
-Field meanings:
+See `config/keys.example.json` for the template. Field meanings:
 
 | Field | Values |
 |---|---|
-| `keyid` | 16-bit decimal integer matching the `KID` embedded in the encrypted voice stream |
-| `algid` | Decimal algorithm ID. See table below. |
-| `key` | Hex string, length depending on `algid` |
+| `keyid` | Integer matching the KID embedded in the encrypted voice stream |
+| `algid` | `170` (= `0xAA`) for ARC4/ADP — the only supported algorithm |
+| `key` | 10 hex chars (40-bit) |
 
-| `algid` | Hex | Algorithm | Key length |
+Multiple entries are supported for key rotation or multiple talkgroup groups.
+
+On startup, the decoder logs a line per key:
+```
+[262] Registered decrypt key: keyid=0x1 algid=0xaa
+```
+
+When `keyid` and `algid` match what's on the air, the call decrypts and a normal WAV/M4A is written. The call appears in the UI with an `ENC` badge (the flag is set from the CC grant, not the audio), but the recording will be audible.
+
+### Supported algorithms
+
+| `algid` | Hex | Algorithm | Status |
 |---|---|---|---|
-| 128 | 0x80 | Clear — no decrypt | — |
-| 129 | 0x81 | DES-OFB (legacy) | 16 hex chars |
-| 132 | 0x84 | AES-256 | 64 hex chars |
-| 170 | 0xAA | Motorola ADP (RC4-40) | 10 hex chars |
+| 170 | 0xAA | Motorola ADP (RC4-40) | **Supported** |
+| 132 | 0x84 | AES-256 | Metadata only |
+| 129 | 0x81 | DES-OFB | Metadata only |
 
-When a decoded voice call's `keyid` and `algid` match an entry, trunk-recorder decrypts inline and writes a clear WAV. The resulting `call_start` / `call_end` events arrive at the API with `encrypted: false`, so the call plays back normally in the UI.
-
-The committed `config/trunk-recorder.json` ships with an obvious placeholder entry (`keyid: 1`, `key: "0000000000"`) — it exists only to establish the JSON shape. It will not decrypt anything. Replace the values with real ones before running a capture you want decoded, and keep key material out of git by editing `config/trunk-recorder.local.json` (gitignored) instead of the committed file.
-
-**What this does not do:** recover keys you don't have, brute-force 40-bit ADP, or decrypt AES-256. Those are out of scope for this project.
+**What this does not do:** recover keys you don't have, or decrypt AES-256/DES. Those are out of scope.
 
 ## Multi-system setups
 
@@ -280,6 +287,8 @@ The nav has five tabs plus a day/night theme toggle (top-right, ☾ / ☀). The 
 ## Call Log
 
 Full paginated history of completed calls for the selected system. Columns: time, talkgroup, group, freq, duration, flags (emergency / encrypted), play button.
+
+The frequency column includes a small `TRUNK0` / `TRUNK1` / `TRUNK2` badge showing which SDR dongle captured the call. This is useful for correlating audio quality issues — calls on TRUNK1 (851–854 MHz) may have elevated BER if there is LTE interference in that band.
 
 **Why some entries have no duration or audio**: if the voice channel was outside the SDR's tuning window, trunk-recorder never recorded audio but our API still synthesizes the `call_end` from the `calls_active` snapshot stream. You get a row with start time, talkgroup, freq, and an inferred duration, but no `audio_file` — the play button doesn't appear.
 

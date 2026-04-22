@@ -33,6 +33,9 @@ WORKDIR /src
 RUN git clone --depth 1 --branch ${TR_REF} https://github.com/robotastic/trunk-recorder . && \
     git clone --depth 1 --branch ${PLUGIN_REF} https://github.com/TrunkRecorder/tr-plugin-mqtt user_plugins/tr-plugin-mqtt
 
+COPY patches/arc4-decrypt.patch /src/arc4-decrypt.patch
+RUN git apply /src/arc4-decrypt.patch
+
 WORKDIR /src/build
 RUN cmake .. && make -j$(nproc) && make DESTDIR=/newroot install
 
@@ -43,7 +46,7 @@ RUN apt-get update && \
     apt-get -y upgrade && \
     export DEBIAN_FRONTEND=noninteractive && \
     apt-get install --no-install-recommends -y \
-      ca-certificates gr-funcube gr-iqbal curl wget docker.io ffmpeg \
+      ca-certificates gr-funcube gr-iqbal curl wget docker.io ffmpeg jq \
       libboost-log1.83.0 libboost-chrono1.83.0t64 \
       libgnuradio-digital3.10.12 libgnuradio-analog3.10.12 \
       libgnuradio-filter3.10.12 libgnuradio-network3.10.12 \
@@ -54,7 +57,9 @@ RUN apt-get update && \
     rm -rf /usr/share/{doc,man,info} /usr/local/share/{doc,man,info}
 
 COPY --from=builder /newroot /
+COPY decoder/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 WORKDIR /app
-ENTRYPOINT ["/usr/local/bin/trunk-recorder"]
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["--config=/app/config.json"]

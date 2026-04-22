@@ -10,7 +10,7 @@ Full operator guide: [`docs/user-manual.md`](docs/user-manual.md) ([PDF](docs/us
 
 | Service | Image / Source | Role |
 |---|---|---|
-| `trunk-recorder` | `./decoder` (debian:trixie multi-stage) | P25 decode, voice follow, audio recording — built locally to bundle the `libmqtt_status_plugin.so` from [TrunkRecorder/tr-plugin-mqtt](https://github.com/TrunkRecorder/tr-plugin-mqtt), which isn't in upstream robotastic/trunk-recorder |
+| `trunk-recorder` | `./decoder` (debian:trixie multi-stage) | P25 decode, voice follow, audio recording — built locally to bundle `libmqtt_status_plugin.so` ([TrunkRecorder/tr-plugin-mqtt](https://github.com/TrunkRecorder/tr-plugin-mqtt)) and apply `patches/arc4-decrypt.patch`, which enables ARC4/ADP decryption (disabled in the upstream binary). Runtime key injection via `decoder/entrypoint.sh` + `jq`. |
 | `mosquitto` | `eclipse-mosquitto:2` | Internal MQTT event bus |
 | `postgres` | `postgres:16-alpine` | Persistent storage — sysid-keyed schema |
 | `api` | `./api` (Node.js) | MQTT subscriber, REST API, WebSocket |
@@ -59,6 +59,26 @@ Web UI: **http://localhost:8080** (nginx proxies `/api` and `/socket.io` to the 
 
 The first `docker compose up` triggers a local trunk-recorder build (~20 min on modest hardware). Subsequent starts just pull from the named image.
 
+## Encrypted call decryption
+
+ARC4/ADP (Motorola algid `0xAA`) decryption is supported. The upstream `trunk-recorder` binary disables it; the local build applies `patches/arc4-decrypt.patch` to re-enable the crypto path and wire up key loading from config.
+
+Create `config/keys.json` (gitignored — never commit it):
+
+```json
+[
+  { "keyid": 1, "algid": 170, "key": "AABBCCDDEE" }
+]
+```
+
+- `algid` 170 = `0xAA` = ARC4/ADP (40-bit key, 10 hex chars)
+- `keyid` must match what the system transmits on-air
+- Multiple keys are supported in the array
+
+`decoder/entrypoint.sh` merges this file into the runtime config via `jq` at container start; the system config in `trunk-recorder.json` carries an empty `"keys": []` placeholder. On startup, the decoder logs `Registered decrypt key: keyid=0x1 algid=0xaa` for each key loaded.
+
+See `config/keys.example.json` for the format template.
+
 ## Talkgroup & Site Import
 
 CSVs in `config/talkgroups/` are auto-imported every time the API
@@ -104,8 +124,8 @@ Five tabs, amber-on-dark tactical-ops aesthetic, day/night theme toggle in the n
 | Tab | Shows |
 |---|---|
 | **Dashboard** | Active calls + stat row (active/emergencies/calls per hour/day + 24 h sparkline) + recent call log |
-| **Call Log** | All completed calls for the current system, with audio playback when available |
-| **Talkgroups** | All imported talkgroups with call counts and last-active time |
+| **Call Log** | All completed calls for the current system, with audio playback when available. Frequency column shows which SDR trunk handled the call (`TRUNK0` / `TRUNK1` / `TRUNK2`). |
+| **Talkgroups** | All imported talkgroups with call counts and last-active time. Click any row to add to the scan list — scan list filters active calls and call log system-wide. Search by name/TGID, filter by group, or toggle to active-only. |
 | **Units** | Observed radios and their most-recent TGs — requires the plugin's `unit_topic` (enabled by default in our config) |
 | **Site Info** | System-level panel (WACN / NAC / RFSS / current site / live CC + decode rate / squelch), SDR source cards, live recorder table, and per-RFSS site cards with NAC / county / lat-lon / coverage range / control + voice frequency chips. Current site gets a `DECODING` badge. |
 
@@ -164,14 +184,19 @@ The remaining services can run rootless, but a single rootful compose stack is s
 
 ```
 junkinthetrunk/
+├── Makefile                      ← build / tag / release targets
 ├── compose.yml
 ├── .env.example
 ├── jitt-host-setup.sh
+├── patches/
+│   └── arc4-decrypt.patch        ← enables ARC4/ADP decryption in trunk-recorder
 ├── decoder/
-│   └── Dockerfile                ← debian:trixie multi-stage; builds
-│                                    trunk-recorder + tr-plugin-mqtt
+│   ├── Dockerfile                ← debian:trixie multi-stage; builds
+│   │                                trunk-recorder + tr-plugin-mqtt + applies patch
+│   └── entrypoint.sh             ← merges config/keys.json into runtime config via jq
 ├── config/
-│   ├── trunk-recorder.json       ← committed 2-dongle MESA config
+│   ├── trunk-recorder.json       ← committed 3-dongle MESA config
+│   ├── keys.example.json         ← ARC4 key format template (keys.json is gitignored)
 │   ├── mosquitto.conf
 │   └── talkgroups/
 │       ├── README.md             ← filename conventions

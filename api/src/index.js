@@ -4,9 +4,13 @@ const express    = require('express');
 const http       = require('http');
 const { Server } = require('socket.io');
 const cors       = require('cors');
+const fs         = require('fs');
+const path       = require('path');
 const mqtt       = require('./mqtt');
 const { query }  = require('./db');
 const { importTalkgroupsFromDisk } = require('./import');
+
+const AUDIO_ROOT = process.env.AUDIO_PATH || '/audio';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -94,6 +98,53 @@ async function cleanStaleActive() {
 }
 
 setInterval(cleanStaleActive, 60_000);
+
+// ── Audio file backfill ───────────────────────────────────────────────────────
+// tr-plugin-mqtt doesn't reliably emit call_end, so audio_file is often null.
+// Scan the audio volume, parse filenames ({tgid}-{ts}_{freq}-call_{n}.m4a),
+// and link each file to the matching call row.
+
+function walkM4a(dir, base) {
+  const out = [];
+  let entries;
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...walkM4a(full, base));
+    else if (e.name.endsWith('.m4a')) out.push({ full, rel: path.relative(base, full), name: e.name });
+  }
+  return out;
+}
+
+async function syncAudioFiles() {
+  try {
+    const files = walkM4a(AUDIO_ROOT, AUDIO_ROOT);
+    let linked = 0;
+    for (const { rel, name } of files) {
+      const m = name.match(/^(\d+)-(\d+(?:\.\d+)?)_(\d+(?:\.\d+)?)-call_\d+\.m4a$/);
+      if (!m) continue;
+      const tgid   = parseInt(m[1], 10);
+      const unixTs = parseFloat(m[2]);
+      const freq   = Math.round(parseFloat(m[3]));
+      const { rowCount } = await query(`
+        UPDATE calls SET audio_file = $1
+        WHERE id = (
+          SELECT id FROM calls
+          WHERE tgid = $2 AND freq = $3 AND audio_file IS NULL
+            AND ABS(EXTRACT(EPOCH FROM start_time) - $4) < 10
+          ORDER BY ABS(EXTRACT(EPOCH FROM start_time) - $4)
+          LIMIT 1
+        )
+      `, [rel, tgid, freq, unixTs]);
+      linked += rowCount;
+    }
+    if (linked > 0) io.emit('calls:updated');
+  } catch (err) {
+    console.error('[audioSync] error:', err.message);
+  }
+}
+
+setInterval(syncAudioFiles, 10_000);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 

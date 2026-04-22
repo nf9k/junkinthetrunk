@@ -25,3 +25,6 @@ config/talkgroups/*.csv
 
 # Local trunk-recorder config variants (single-dongle test, etc.)
 config/trunk-recorder.local.json
+
+# Decryption keys — never commit
+config/keys.json

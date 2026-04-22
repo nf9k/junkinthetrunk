@@ -2,7 +2,21 @@
 
 const { Router } = require('express');
 const { query }  = require('../db');
+const fs         = require('fs');
 const router     = Router();
+
+let _bandplans = null;
+function getBandplans() {
+  if (_bandplans) return _bandplans;
+  try {
+    const cfg = JSON.parse(fs.readFileSync('/app/tr-config.json', 'utf8'));
+    _bandplans = {};
+    for (const sys of (cfg.systems || [])) {
+      if (sys.shortName) _bandplans[sys.shortName.toUpperCase()] = sys.bandplan || null;
+    }
+  } catch { _bandplans = {}; }
+  return _bandplans;
+}
 
 // GET /api/systems
 router.get('/', async (req, res) => {
@@ -35,6 +49,7 @@ router.get('/:sysid', async (req, res) => {
     `SELECT * FROM sites WHERE sysid=$1 ORDER BY rfss_id, site_id`, [sysid]
   );
   system.sites = sites;
+  system.bandplan = getBandplans()[sysid] || null;
   res.json(system);
 });
 

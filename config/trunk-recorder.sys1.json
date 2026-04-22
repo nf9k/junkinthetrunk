@@ -1,0 +1,86 @@
+{
+  "ver": 2,
+
+  "sources": [
+    {
+      "center":  857312500,
+      "rate":    2400000,
+      "error":   0,
+      "gain":    20,
+      "squelch": -160,
+      "driver":  "osmosdr",
+      "device":  "rtl=TRUNK0",
+      "digitalRecorders": 10,
+      "antenna": "TRUNK0 — SYS1 CCs 856.1625/856.5125/857.6625/858.1875 + voice 856.1–858.5 MHz"
+    },
+    {
+      "center":  852800000,
+      "rate":    2880000,
+      "error":   0,
+      "gain":    30,
+      "squelch": -60,
+      "driver":  "osmosdr",
+      "device":  "rtl=TRUNK1",
+      "digitalRecorders": 10,
+      "antenna": "TRUNK1 — 851.36–854.24 MHz (limited SYS1 use; SYS1 voice mostly above 854.9)"
+    },
+    {
+      "center":  859312500,
+      "rate":    2400000,
+      "error":   0,
+      "gain":    20,
+      "squelch": -60,
+      "driver":  "osmosdr",
+      "device":  "rtl=TRUNK2",
+      "digitalRecorders": 8,
+      "antenna": "TRUNK2 — SYS1 voice 858.1–860.5 MHz (858.762–859.987)"
+    }
+  ],
+
+  "systems": [
+    {
+      "shortName":        "10A",
+      "type":             "p25",
+      "sysId":            610,
+      "control_channels": [
+        858187500, 856512500, 856162500, 857662500
+      ],
+      "recordUnknown":    false,
+      "monitorEncrypted": true,
+      "bandplan":         "rebanded800",
+      "talkgroupsFile":   "/app/talkgroups/10A.csv",
+      "audioArchive":     true,
+      "callTimeout":      3,
+      "keys": []
+    }
+  ],
+
+  "plugins": [
+    {
+      "name":       "MQTT Status",
+      "library":    "libmqtt_status_plugin.so",
+      "broker":     "tcp://mosquitto:1883",
+      "topic":      "jitr",
+      "unit_topic": "jitr/units",
+      "client_id":  "jitr-decoder",
+      "mqtt_audio": false,
+      "qos":        0
+    }
+  ],
+
+  "captureDir": "/app/audio",
+  "logFile":    false,
+
+  "_notes": [
+    "SYS1 = MESA Marion Co. Public Safety Simulcast, site hex A (decimal 10), NAC 261.",
+    "shortName '10A' is the site identifier — NOT the P25 sysid (which is still 0x262=610).",
+    "All four SYS1 CCs (856.1625, 856.5125, 857.6625, 858.1875 MHz) are within TRUNK0's range.",
+    "SYS1 voice gap: 854.9875, 855.4875, 855.9875 MHz are below TRUNK0 and above TRUNK1 — missed.",
+    "All other SYS1 voice (856.2–858.3 on TRUNK0, 858.8–860.0 on TRUNK2) is covered.",
+    "Before starting in SYS1 mode, ensure config/talkgroups/10A.csv exists:",
+    "  cp config/talkgroups/262.csv config/talkgroups/10A.csv",
+    "To activate: set TR_CONFIG=trunk-recorder.sys1.json in .env, then:",
+    "  docker compose up -d trunk-recorder",
+    "To revert to SYS3: remove TR_CONFIG from .env (or set to trunk-recorder.json)."
+  ]
+}

@@ -4,15 +4,16 @@ services:
 
   trunk-recorder:
     build:
-      context: ./decoder
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: decoder/Dockerfile
     image: jitr-trunk-recorder:local
     container_name: jitr-decoder
     privileged: true
     devices:
       - /dev/bus/usb
     volumes:
-      - ./config/trunk-recorder.json:/app/config.json:ro
+      - ./config/${TR_CONFIG:-trunk-recorder.json}:/app/config.json:ro
+      - ./config/keys.json:/app/keys.json:ro
       - ./config/talkgroups:/app/talkgroups:ro
       - audio-data:/app/audio
     environment:
@@ -60,6 +61,7 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+    image: jitr-api:local
     container_name: jitr-api
     environment:
       - DATABASE_URL=postgresql://jitr:${DB_PASSWORD}@postgres/jitr
@@ -71,8 +73,9 @@ services:
     volumes:
       - audio-data:/audio:ro
       - ./config/talkgroups:/talkgroups:ro
+      - ./config/${TR_CONFIG:-trunk-recorder.json}:/app/tr-config.json:ro
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3001:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -89,6 +92,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: jitr-frontend:local
       args:
         # Empty default → frontend uses same-origin and nginx proxies
         # /api and /socket.io to the api container internally. Override

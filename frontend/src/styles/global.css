@@ -1,21 +1,21 @@
 /* ── Junk in the Trunk — Global Styles ──────────────────────────────────────
    Aesthetic: Dark tactical operations center / vintage radio operator
    Fonts: Bebas Neue (display) · Share Tech Mono (data) · Barlow (body)
-   Palette: near-black navy + amber + terminal green + emergency red
+   Palette: medium-dark slate + cyan + terminal green + emergency red
 ─────────────────────────────────────────────────────────────────────────── */
 
 :root {
-  --bg-base:      #07090d;
-  --bg-surface:   #0d1018;
-  --bg-elevated:  #131820;
-  --bg-input:     #0a0d14;
+  --bg-base:      #0c1620;
+  --bg-surface:   #111f2d;
+  --bg-elevated:  #172a3a;
+  --bg-input:     #0e1c28;
 
-  --border:       #1e2736;
-  --border-bright:#2a3a52;
+  --border:       #1e3244;
+  --border-bright:#2a4860;
 
-  --amber:        #e8820c;
-  --amber-dim:    #7a440a;
-  --amber-glow:   rgba(232, 130, 12, 0.15);
+  --cyan:         #00d0e8;
+  --cyan-dim:     #005566;
+  --cyan-glow:    rgba(0, 208, 232, 0.13);
 
   --green:        #00e87a;
   --green-dim:    #005c31;
@@ -31,9 +31,9 @@
   --purple:       #a855f7;
   --purple-dim:   #3b1466;
 
-  --text-primary: #d4dce8;
-  --text-muted:   #4a5a72;
-  --text-dim:     #2a3a52;
+  --text-primary: #c8dde8;
+  --text-muted:   #4a6a80;
+  --text-dim:     #2a4055;
 
   --font-display: 'Bebas Neue', sans-serif;
   --font-mono:    'Share Tech Mono', monospace;
@@ -57,16 +57,16 @@
 /* Day theme — cream/paper background, darker accent dims for contrast.
    Applied via <html data-theme="day">; the toggle lives in the nav. */
 :root[data-theme="day"] {
-  --bg-base:      #f6f2e8;
+  --bg-base:      #f0f5f8;
   --bg-surface:   #ffffff;
-  --bg-elevated:  #fbf8f0;
-  --bg-input:     #f0ebdd;
+  --bg-elevated:  #f5f9fc;
+  --bg-input:     #e8f0f5;
 
-  --border:       #d8d0c0;
-  --border-bright:#b4a890;
+  --border:       #c8d8e4;
+  --border-bright:#a0b8c8;
 
-  --amber-dim:    #b56500;
-  --amber-glow:   rgba(232, 130, 12, 0.10);
+  --cyan-dim:    #007080;
+  --cyan-glow:   rgba(0, 180, 200, 0.10);
 
   --green:        #0a9950;
   --green-dim:    #005e2d;
@@ -78,9 +78,9 @@
   --blue-dim:     #0a3d82;
   --purple-dim:   #5a2090;
 
-  --text-primary: #1a1f28;
-  --text-muted:   #5a5548;
-  --text-dim:     #8a8478;
+  --text-primary: #0f1e28;
+  --text-muted:   #4a6070;
+  --text-dim:     #7a9aaa;
 
   --scanline-color: rgba(0, 0, 0, 0.025);
 }
@@ -142,8 +142,8 @@ body::before {
   font-family: var(--font-display);
   font-size: 1.692rem;
   letter-spacing: 3px;
-  color: var(--amber);
-  text-shadow: 0 0 20px var(--amber-dim);
+  color: var(--cyan);
+  text-shadow: none;
   line-height: 1;
   margin-bottom: 2px;
 }
@@ -220,9 +220,9 @@ body::before {
 }
 
 .nav-item.active {
-  background: var(--amber-glow);
-  color: var(--amber);
-  border-left-color: var(--amber);
+  background: var(--cyan-glow);
+  color: var(--cyan);
+  border-left-color: var(--cyan);
 }
 
 .nav-item .nav-icon {
@@ -259,7 +259,7 @@ body::before {
 }
 
 .sidebar-system .sys-label { color: var(--text-dim); font-size: 0.692rem; letter-spacing: 1px; }
-.sidebar-system .sys-id    { color: var(--amber); font-size: 1rem; margin: 1px 0; }
+.sidebar-system .sys-id    { color: var(--cyan); font-size: 1rem; margin: 1px 0; }
 .sidebar-system .sys-name  { color: var(--text-muted); }
 
 /* ── Main content ────────────────────────────────────────────────────────────── */
@@ -356,12 +356,12 @@ body::before {
   font-family: var(--font-display);
   font-size: 2.462rem;
   line-height: 1;
-  color: var(--amber);
-  text-shadow: 0 0 20px var(--amber-dim);
+  color: var(--cyan);
+  text-shadow: none;
 }
 
-.stat-value.green  { color: var(--green);  text-shadow: 0 0 20px var(--green-dim); }
-.stat-value.red    { color: var(--red);    text-shadow: 0 0 20px var(--red-dim); }
+.stat-value.green  { color: var(--green); }
+.stat-value.red    { color: var(--red); }
 
 /* ── Active call cards ───────────────────────────────────────────────────────── */
 
@@ -442,7 +442,7 @@ body::before {
   color: var(--text-muted);
 }
 
-.call-freq { color: var(--amber); }
+.call-freq { color: var(--cyan); }
 .call-unit { color: var(--blue); }
 
 .call-group-tag {
@@ -459,7 +459,7 @@ body::before {
 /* Group tag colors */
 .tag-law    { background: rgba(59,139,255,0.15); color: var(--blue); }
 .tag-fire   { background: rgba(255,59,59,0.15);  color: var(--red); }
-.tag-ems    { background: rgba(232,130,12,0.15); color: var(--amber); }
+.tag-ems    { background: rgba(255,153,0,0.15);  color: #ff9900; }
 .tag-public { background: rgba(74,90,114,0.15);  color: #7a8ea6; }
 .tag-other  { background: rgba(74,90,114,0.1);   color: var(--text-muted); }
 
@@ -500,7 +500,7 @@ body::before {
 }
 
 .td-tgid    { color: var(--text-muted); }
-.td-freq    { color: var(--amber); }
+.td-freq    { color: var(--cyan); }
 .td-unit    { color: var(--blue); }
 .td-time    { color: var(--text-muted); }
 .td-dur     { color: var(--text-muted); }
@@ -527,8 +527,11 @@ body::before {
   transition: border-color 0.15s;
 }
 
-.input-field:focus { border-color: var(--amber); }
+.input-field:focus { border-color: var(--cyan); }
 .input-field::placeholder { color: var(--text-dim); }
+
+select.input-field { cursor: pointer; }
+select.input-field option { background: var(--bg-surface); color: var(--text-primary); }
 
 .btn {
   padding: 6px 12px;
@@ -543,11 +546,11 @@ body::before {
 }
 
 .btn-primary {
-  background: var(--amber-glow);
-  border-color: var(--amber-dim);
-  color: var(--amber);
+  background: var(--cyan-glow);
+  border-color: var(--cyan-dim);
+  color: var(--cyan);
 }
-.btn-primary:hover { background: rgba(232,130,12,0.25); border-color: var(--amber); }
+.btn-primary:hover { background: rgba(0,208,232,0.22); border-color: var(--cyan); }
 
 .btn-ghost {
   background: transparent;
@@ -555,6 +558,12 @@ body::before {
   color: var(--text-muted);
 }
 .btn-ghost:hover { border-color: var(--border-bright); color: var(--text-primary); }
+.btn-active {
+  background: var(--cyan-dim);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.btn-active:hover { background: var(--cyan-dim); border-color: var(--cyan); }
 
 /* ── Sparkline ───────────────────────────────────────────────────────────────── */
 
@@ -567,7 +576,7 @@ body::before {
 
 .spark-bar {
   flex: 1;
-  background: var(--amber-dim);
+  background: var(--cyan-dim);
   border-radius: 1px;
   min-height: 2px;
   transition: height 0.3s ease;
@@ -586,7 +595,7 @@ body::before {
 .mb-20        { margin-bottom: 20px; }
 .text-muted   { color: var(--text-muted); }
 .text-mono    { font-family: var(--font-mono); }
-.text-amber   { color: var(--amber); }
+.text-cyan    { color: var(--cyan); }
 .text-green   { color: var(--green); }
 .text-red     { color: var(--red); }
 .empty-state  { text-align: center; padding: 40px; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.846rem; }
@@ -661,8 +670,8 @@ body::before {
   font-family: var(--font-display);
   font-size: 1.538rem;
   letter-spacing: 4px;
-  color: var(--amber);
-  text-shadow: 0 0 20px var(--amber-dim);
+  color: var(--cyan);
+  text-shadow: none;
 }
 
 .nav__links { display: flex; flex: 1; gap: 2px; }
@@ -686,7 +695,7 @@ body::before {
   position: relative;
 }
 .nav__link:hover                   { color: var(--text-primary); }
-.nav__link--active                 { color: var(--amber); border-bottom-color: var(--amber); }
+.nav__link--active                 { color: var(--cyan); border-bottom-color: var(--cyan); }
 
 .nav__badge {
   background: var(--green);
@@ -723,9 +732,9 @@ body::before {
   cursor: pointer;
 }
 .theme-toggle:hover {
-  color: var(--amber);
-  border-color: var(--amber-dim);
-  background: var(--amber-glow);
+  color: var(--cyan);
+  border-color: var(--cyan-dim);
+  background: var(--cyan-glow);
 }
 
 /* ── System selector bar ─────────────────────────────────────────────────────── */
@@ -752,7 +761,7 @@ body::before {
   margin-right: 4px;
 }
 .sys-btn:hover        { border-color: var(--border-bright); color: var(--text-primary); }
-.sys-btn--active      { background: var(--amber-glow); border-color: var(--amber-dim); color: var(--amber); }
+.sys-btn--active      { background: var(--cyan-glow); border-color: var(--cyan-dim); color: var(--cyan); }
 
 /* ── Page body ───────────────────────────────────────────────────────────────── */
 
@@ -774,7 +783,7 @@ body::before {
   border: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: 0.692rem;
-  color: var(--amber);
+  color: var(--cyan);
   padding: 1px 6px;
   border-radius: 8px;
 }
@@ -817,10 +826,10 @@ body::before {
   font-family: var(--font-display);
   font-size: 2.308rem;
   line-height: 1;
-  color: var(--amber);
-  text-shadow: 0 0 16px var(--amber-dim);
+  color: var(--cyan);
+  text-shadow: none;
 }
-.stat-box--alert .stat-box__value { color: var(--red); text-shadow: 0 0 16px var(--red-dim); }
+.stat-box--alert .stat-box__value { color: var(--red); }
 
 .stat-spark {
   flex: 1;
@@ -852,12 +861,12 @@ body::before {
 }
 .sparkline__bar {
   flex: 1;
-  background: var(--amber-dim);
+  background: var(--cyan-dim);
   border-radius: 1px;
   min-height: 2px;
   transition: height 0.3s ease;
 }
-.sparkline__bar:hover { background: var(--amber); }
+.sparkline__bar:hover { background: var(--cyan); }
 
 /* ── Active call cards ───────────────────────────────────────────────────────── */
 
@@ -915,7 +924,7 @@ body::before {
   margin-bottom: 6px;
 }
 
-.call-card__freq { font-family: var(--font-mono); font-size: 0.846rem; color: var(--amber); }
+.call-card__freq { font-family: var(--font-mono); font-size: 0.846rem; color: var(--cyan); }
 
 /* ── Badges ──────────────────────────────────────────────────────────────────── */
 
@@ -935,6 +944,19 @@ body::before {
 }
 .badge--enc  { background: rgba(168,85,247,0.2); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
 .badge--phase { background: var(--bg-base); color: var(--text-muted); border: 1px solid var(--border); }
+.trunk-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 0 4px;
+  font-size: 0.65em;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  vertical-align: middle;
+  letter-spacing: 0.04em;
+}
 
 /* ── Table ───────────────────────────────────────────────────────────────────── */
 
@@ -960,6 +982,12 @@ body::before {
 .tbl-row:hover td { background: var(--bg-elevated); }
 
 .tbl-empty { padding: 32px; text-align: center; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.846rem; letter-spacing: 2px; }
+
+.tbl-row--clickable { cursor: pointer; user-select: none; }
+.tbl-row--scanned td { background: rgba(0, 232, 122, 0.06); }
+.tbl-row--scanned:hover td { background: rgba(0, 232, 122, 0.11) !important; }
+.tbl-row--muted td { color: var(--text-dim) !important; }
+.tbl-row--muted td span { color: inherit !important; }
 
 /* ── Audio bar ───────────────────────────────────────────────────────────────── */
 
@@ -991,9 +1019,9 @@ body::before {
 .audio-bar__close:hover { border-color: var(--red-dim); color: var(--red); }
 
 .btn-audio {
-  background: var(--amber-glow);
-  border: 1px solid var(--amber-dim);
-  color: var(--amber);
+  background: var(--cyan-glow);
+  border: 1px solid var(--cyan-dim);
+  color: var(--cyan);
   font-size: 0.769rem;
   padding: 2px 7px;
   border-radius: var(--radius-sm);
@@ -1016,8 +1044,8 @@ body::before {
   padding: 14px 16px;
 }
 .site-card--current {
-  border-color: var(--amber-dim);
-  box-shadow: 0 0 0 1px var(--amber-dim), 0 0 24px var(--amber-glow);
+  border-color: var(--cyan-dim);
+  box-shadow: 0 0 0 1px var(--cyan-dim), 0 0 24px var(--cyan-glow);
 }
 
 .site-card__header {
@@ -1032,7 +1060,7 @@ body::before {
   font-family: var(--font-display);
   font-size: 1.308rem;
   letter-spacing: 0.04em;
-  color: var(--amber);
+  color: var(--cyan);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1043,7 +1071,7 @@ body::before {
   text-decoration: none;
   border-bottom: 1px dotted var(--blue-dim);
 }
-.site-card__maplink:hover { color: var(--amber); border-color: var(--amber-dim); }
+.site-card__maplink:hover { color: var(--cyan); border-color: var(--cyan-dim); }
 
 .site-card__channels-label {
   letter-spacing: 0.12em;
@@ -1063,15 +1091,55 @@ body::before {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   color: var(--text-muted);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
 }
 .freq-chip--ctrl {
-  color: var(--amber);
-  border-color: var(--amber-dim);
-  background: var(--amber-glow);
+  color: var(--cyan);
+  border-color: var(--cyan-dim);
+  background: var(--cyan-glow);
 }
 .freq-chip--primary {
   border-width: 2px;
   font-weight: bold;
+}
+.chip-ch {
+  font-size: 0.615rem;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+/* ── Band plan card ──────────────────────────────────────────────────────────── */
+
+.bandplan-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  margin-bottom: 24px;
+}
+.bandplan-title {
+  color: var(--cyan);
+  font-family: var(--font-display);
+  font-size: 1.154rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.bandplan-params {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 5px 24px;
+  font-size: 0.846rem;
+}
+.bandplan-params > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
 }
 
 .badge--live {
@@ -1098,7 +1166,7 @@ body::before {
 }
 .sdr-card__title {
   font-size: 1rem;
-  color: var(--amber);
+  color: var(--cyan);
   margin-bottom: 8px;
 }
 .sdr-card__stats {
