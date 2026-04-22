@@ -37,7 +37,15 @@
       "bandplan":         "rebanded800",
       "talkgroupsFile":   "/app/talkgroups/262.csv",
       "audioArchive":     true,
-      "callTimeout":      3
+      "callTimeout":      3,
+      "keys": [
+        {
+          "_comment": "PLACEHOLDER — replace keyid + key with your authorized values before running. algid 170 = 0xAA = Motorola ADP (40-bit RC4, 10 hex chars). algid 132 = 0x84 = AES-256 (64 hex chars).",
+          "keyid": 1,
+          "algid": 170,
+          "key":   "0000000000"
+        }
+      ]
     }
   ],
 

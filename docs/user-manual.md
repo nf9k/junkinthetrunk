@@ -181,6 +181,44 @@ Both files are read on API container startup. Imports are idempotent — drop an
 
 RadioReference premium data is subscriber-licensed. The repo's `.gitignore` excludes `config/talkgroups/*.csv` (keeping only the `example.csv` / `example.sites.csv` placeholders) so real exports stay local.
 
+## Encrypted voice (authorized use only)
+
+trunk-recorder supports an optional `keys[]` array on each system, used only when you have legitimate authorization to receive and decode a system's encrypted traffic — e.g. you administer the radio system or are acting under explicit permission of whoever does. Skip this section otherwise.
+
+The shape is generic:
+
+```json
+{
+  "shortName": "<your sysid>",
+  "sysId": <sysid-decimal>,
+  "...": "...",
+  "keys": [
+    { "keyid": <kid>, "algid": <algid>, "key": "<hex>" }
+  ]
+}
+```
+
+Field meanings:
+
+| Field | Values |
+|---|---|
+| `keyid` | 16-bit decimal integer matching the `KID` embedded in the encrypted voice stream |
+| `algid` | Decimal algorithm ID. See table below. |
+| `key` | Hex string, length depending on `algid` |
+
+| `algid` | Hex | Algorithm | Key length |
+|---|---|---|---|
+| 128 | 0x80 | Clear — no decrypt | — |
+| 129 | 0x81 | DES-OFB (legacy) | 16 hex chars |
+| 132 | 0x84 | AES-256 | 64 hex chars |
+| 170 | 0xAA | Motorola ADP (RC4-40) | 10 hex chars |
+
+When a decoded voice call's `keyid` and `algid` match an entry, trunk-recorder decrypts inline and writes a clear WAV. The resulting `call_start` / `call_end` events arrive at the API with `encrypted: false`, so the call plays back normally in the UI.
+
+The committed `config/trunk-recorder.json` ships with an obvious placeholder entry (`keyid: 1`, `key: "0000000000"`) — it exists only to establish the JSON shape. It will not decrypt anything. Replace the values with real ones before running a capture you want decoded, and keep key material out of git by editing `config/trunk-recorder.local.json` (gitignored) instead of the committed file.
+
+**What this does not do:** recover keys you don't have, brute-force 40-bit ADP, or decrypt AES-256. Those are out of scope for this project.
+
 ## Multi-system setups
 
 Nothing about the stack is single-system — the DB keys everything by sysid. To monitor two systems:
