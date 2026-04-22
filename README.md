@@ -23,7 +23,7 @@ Decodes P25 Phase 1 & 2 control channels via RTL-SDR, stores call records in Pos
 ## First-Time Setup
 
 ```bash
-git clone <repo> && cd junk-in-the-trunk
+git clone https://github.com/nf9k/junkinthetrunk.git && cd junkinthetrunk
 
 # 1. Host prep (root) — DVB blacklist, udev rules, dongle enumeration
 sudo ./jitt-host-setup.sh
@@ -113,7 +113,7 @@ The remaining services can run rootless, but a single rootful compose stack is s
 ## Directory Layout
 
 ```
-junk-in-the-trunk/
+junkinthetrunk/
 ├── compose.yml
 ├── .env.example
 ├── jitt-host-setup.sh
