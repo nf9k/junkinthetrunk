@@ -1,0 +1,10 @@
+.env
+compose.override.yml
+compose.override.yaml
+node_modules/
+dist/
+build/
+*.log
+.DS_Store
+.vscode/
+.idea/
