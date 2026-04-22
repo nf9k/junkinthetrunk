@@ -36,9 +36,10 @@ Personal homelab project, not on code.roche.com.
 - api/src/mqtt.js — trunk-recorder event handler (handleCallStart/End/Rates)
 - api/src/import.js — talkgroup CSV auto-import on startup (<sysid>.csv convention)
 - api/src/routes/ — systems.js, calls.js, talkgroups.js, units.js
-- frontend/src/App.jsx — all UI (Dashboard, Call Log, Talkgroups, Units)
-- frontend/src/styles/global.css — CSS variables + all component classes
+- frontend/src/App.jsx — all UI (Dashboard, Call Log, Talkgroups, Units, Site Info) + day/night toggle
+- frontend/src/styles/global.css — CSS variables + day-mode override + all component classes
 - jitt-host-setup.sh — run once as root on host (DVB blacklist, udev, rtl_test)
+- decoder/Dockerfile — debian:trixie multi-stage build of trunk-recorder + tr-plugin-mqtt
 
 ## What's not done yet
 - ntfy push alerts on emergency calls
