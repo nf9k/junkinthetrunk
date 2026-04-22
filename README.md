@@ -10,7 +10,7 @@ Full operator guide: [`docs/user-manual.md`](docs/user-manual.md) ([PDF](docs/us
 
 | Service | Image / Source | Role |
 |---|---|---|
-| `trunk-recorder` | `./decoder` (debian:trixie multi-stage) | P25 decode, voice follow, audio recording — built locally to bundle `libmqtt_status_plugin.so` ([TrunkRecorder/tr-plugin-mqtt](https://github.com/TrunkRecorder/tr-plugin-mqtt)) and apply `patches/arc4-decrypt.patch`, which enables ARC4/ADP decryption (disabled in the upstream binary). Runtime key injection via `decoder/entrypoint.sh` + `jq`. |
+| `trunk-recorder` | `./decoder` (debian:trixie multi-stage) | P25 decode, voice follow, audio recording — built locally to bundle `libmqtt_status_plugin.so` ([TrunkRecorder/tr-plugin-mqtt](https://github.com/TrunkRecorder/tr-plugin-mqtt)) and patches from `patches/`. Runtime config assembly via `decoder/entrypoint.sh`. |
 | `mosquitto` | `eclipse-mosquitto:2` | Internal MQTT event bus |
 | `postgres` | `postgres:16-alpine` | Persistent storage — sysid-keyed schema |
 | `api` | `./api` (Node.js) | MQTT subscriber, REST API, WebSocket |
@@ -61,23 +61,7 @@ The first `docker compose up` triggers a local trunk-recorder build (~20 min on 
 
 ## Encrypted call decryption
 
-ARC4/ADP (Motorola algid `0xAA`) decryption is supported. The upstream `trunk-recorder` binary disables it; the local build applies `patches/arc4-decrypt.patch` to re-enable the crypto path and wire up key loading from config.
-
-Create `config/keys.json` (gitignored — never commit it):
-
-```json
-[
-  { "keyid": 1, "algid": 170, "key": "AABBCCDDEE" }
-]
-```
-
-- `algid` 170 = `0xAA` = ARC4/ADP (40-bit key, 10 hex chars)
-- `keyid` must match what the system transmits on-air
-- Multiple keys are supported in the array
-
-`decoder/entrypoint.sh` merges this file into the runtime config via `jq` at container start; the system config in `trunk-recorder.json` carries an empty `"keys": []` placeholder. On startup, the decoder logs `Registered decrypt key: keyid=0x1 algid=0xaa` for each key loaded.
-
-See `config/keys.example.json` for the format template.
+Decryption of encrypted talkgroups is supported for operators who are authorized to receive the traffic. Place your key material in `config/keys.json` (gitignored — see `config/keys.example.json` for the format). The decoder picks it up automatically at start via `decoder/entrypoint.sh`.
 
 ## Talkgroup & Site Import
 
@@ -189,14 +173,14 @@ junkinthetrunk/
 ├── .env.example
 ├── jitt-host-setup.sh
 ├── patches/
-│   └── arc4-decrypt.patch        ← enables ARC4/ADP decryption in trunk-recorder
+│   └── arc4-decrypt.patch        ← decoder patches applied at build time
 ├── decoder/
 │   ├── Dockerfile                ← debian:trixie multi-stage; builds
 │   │                                trunk-recorder + tr-plugin-mqtt + applies patch
 │   └── entrypoint.sh             ← merges config/keys.json into runtime config via jq
 ├── config/
 │   ├── trunk-recorder.json       ← committed 3-dongle MESA config
-│   ├── keys.example.json         ← ARC4 key format template (keys.json is gitignored)
+│   ├── keys.example.json         ← key format template (keys.json is gitignored)
 │   ├── mosquitto.conf
 │   └── talkgroups/
 │       ├── README.md             ← filename conventions

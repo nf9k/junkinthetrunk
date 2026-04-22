@@ -47,7 +47,7 @@ A P25 trunked system is a network of radios that shares a small pool of RF chann
 
 - Not a broadcast-audio streamer. There's a built-in audio player for recorded calls, but no live-listen path (by design — simpler, lower load).
 - Not an OpenMHz / Broadcastify uploader. Those plugins are bundled in the decoder image but disabled by default; configure `trunk-recorder.json` manually if you want them.
-- Supports ARC4/ADP (Motorola algid `0xAA`, 40-bit) decryption when keys are configured in `config/keys.json`. AES-256 and DES-OFB encrypted calls record metadata only — you see the talkgroup, unit IDs, and frequency but not the audio.
+- Supports decryption of encrypted talkgroups when the operator is authorized and configures keys in `config/keys.json`. Calls whose encryption is not configured record metadata only.
 
 \newpage
 
@@ -183,48 +183,11 @@ RadioReference premium data is subscriber-licensed. The repo's `.gitignore` excl
 
 ## Encrypted voice (authorized use only)
 
-ARC4/ADP (Motorola algid `0xAA`, 40-bit) decryption is supported when you have legitimate authorization — e.g. you administer the radio system or operate under explicit permission. Skip this section otherwise.
+Decryption of encrypted talkgroups is supported for operators who hold legitimate authorization to receive the traffic — e.g. you administer the system or operate under explicit permission of the system owner. Skip this section otherwise.
 
-### How it works
+Create `config/keys.json` (gitignored — never commit real key material) following the format in `config/keys.example.json`. The decoder merges it into the runtime config automatically at start. Multiple keys are supported for systems that use key rotation or separate keys per talkgroup group.
 
-The upstream `trunk-recorder` binary has decryption disabled at compile time. This stack applies `patches/arc4-decrypt.patch` during the Docker build to re-enable it, and `decoder/entrypoint.sh` merges your key file into the runtime config via `jq` at container start.
-
-### Key configuration
-
-Create `config/keys.json` (gitignored — never commit it):
-
-```json
-[
-  { "keyid": 1, "algid": 170, "key": "AABBCCDDEE" }
-]
-```
-
-See `config/keys.example.json` for the template. Field meanings:
-
-| Field | Values |
-|---|---|
-| `keyid` | Integer matching the KID embedded in the encrypted voice stream |
-| `algid` | `170` (= `0xAA`) for ARC4/ADP — the only supported algorithm |
-| `key` | 10 hex chars (40-bit) |
-
-Multiple entries are supported for key rotation or multiple talkgroup groups.
-
-On startup, the decoder logs a line per key:
-```
-[262] Registered decrypt key: keyid=0x1 algid=0xaa
-```
-
-When `keyid` and `algid` match what's on the air, the call decrypts and a normal WAV/M4A is written. The call appears in the UI with an `ENC` badge (the flag is set from the CC grant, not the audio), but the recording will be audible.
-
-### Supported algorithms
-
-| `algid` | Hex | Algorithm | Status |
-|---|---|---|---|
-| 170 | 0xAA | Motorola ADP (RC4-40) | **Supported** |
-| 132 | 0x84 | AES-256 | Metadata only |
-| 129 | 0x81 | DES-OFB | Metadata only |
-
-**What this does not do:** recover keys you don't have, or decrypt AES-256/DES. Those are out of scope.
+Encrypted calls that are successfully decrypted produce a normal WAV/M4A recording in the audio archive. The `ENC` badge remains on the call log row (the flag comes from the control channel grant), but the recording is audible. Calls whose encryption is not configured produce metadata only.
 
 ## Multi-system setups
 
