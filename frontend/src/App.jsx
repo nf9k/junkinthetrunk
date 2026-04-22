@@ -83,13 +83,13 @@ function CallRow({ call, onAudio }) {
     <tr className="tbl-row">
       <td className="mono dim xs">{fmtTime(call.start_time)}</td>
       <td>
-        <span style={{ color, fontFamily: 'var(--font-display)', fontSize: 15, letterSpacing: '0.05em' }}>
+        <span style={{ color, fontFamily: 'var(--font-display)', fontSize: '1.154rem', letterSpacing: '0.05em' }}>
           {call.alpha_tag || `TG ${call.tgid}`}
         </span>
         <span className="mono dim xs" style={{ marginLeft: 8 }}>{call.tgid}</span>
       </td>
       <td className="mono dim xs">{call.group_tag || '—'}</td>
-      <td className="mono dim xs">{fmtFreq(call.freq)} <span className="dim" style={{fontSize:10}}>MHz</span></td>
+      <td className="mono dim xs">{fmtFreq(call.freq)} <span className="dim" style={{fontSize: '0.769rem'}}>MHz</span></td>
       <td className="mono dim xs">{fmtDur(call.duration)}</td>
       <td>
         {call.emergency && <span className="badge badge--emrg">EMRG</span>}
@@ -110,7 +110,7 @@ function TGRow({ tg }) {
   return (
     <tr className="tbl-row">
       <td>
-        <span style={{ color, fontFamily: 'var(--font-display)', fontSize: 15, letterSpacing: '0.05em' }}>
+        <span style={{ color, fontFamily: 'var(--font-display)', fontSize: '1.154rem', letterSpacing: '0.05em' }}>
           {tg.alpha_tag || `TG ${tg.tgid}`}
         </span>
       </td>
@@ -128,10 +128,10 @@ function TGRow({ tg }) {
 function UnitRow({ unit }) {
   return (
     <tr className="tbl-row">
-      <td className="mono" style={{ color: 'var(--amber)', fontSize: 13 }}>{unit.unit_id}</td>
+      <td className="mono" style={{ color: 'var(--amber)', fontSize: '1rem' }}>{unit.unit_id}</td>
       <td className="mono dim xs">{unit.last_tg_name || unit.last_tgid || '—'}</td>
       <td className="mono dim xs">{unit.group_tag || '—'}</td>
-      <td className="mono dim xs">{fmtFreq(unit.last_freq)} {unit.last_freq ? <span style={{fontSize:10}}>MHz</span> : ''}</td>
+      <td className="mono dim xs">{fmtFreq(unit.last_freq)} {unit.last_freq ? <span style={{fontSize: '0.769rem'}}>MHz</span> : ''}</td>
       <td className="mono xs" style={{ color: 'var(--amber)' }}>{unit.call_count || 0}</td>
       <td className="mono dim xs">{fmtTime(unit.last_seen)}</td>
     </tr>
@@ -179,7 +179,10 @@ function Stat({ label, value, alert }) {
 // ── Nav ───────────────────────────────────────────────────────────────────────
 const PAGES = ['Dashboard', 'Call Log', 'Talkgroups', 'Units', 'Site Info'];
 
-function Nav({ page, setPage, connected, activeCount, emergencyCount, theme, toggleTheme }) {
+const FONT_SIZE_LABELS = { small: 'S', normal: 'M', large: 'L', xlarge: 'XL' };
+
+function Nav({ page, setPage, connected, activeCount, emergencyCount,
+              theme, toggleTheme, fontSize, cycleFontSize }) {
   return (
     <nav className="nav">
       <div className="nav__brand">
@@ -202,6 +205,9 @@ function Nav({ page, setPage, connected, activeCount, emergencyCount, theme, tog
       </div>
 
       <div className="nav__status mono">
+        <button className="theme-toggle mono" onClick={cycleFontSize} title="Cycle font size (S / M / L / XL)">
+          A {FONT_SIZE_LABELS[fontSize] || 'M'}
+        </button>
         <button className="theme-toggle mono" onClick={toggleTheme} title="Toggle day / night view">
           {theme === 'day' ? '☀ DAY' : '☾ NIGHT'}
         </button>
@@ -216,13 +222,13 @@ function SysBar({ systems, sysid, setSysid }) {
   if (!systems.length) return null;
   return (
     <div className="sys-bar">
-      <span className="mono dim" style={{ fontSize: 10, marginRight: 10 }}>SYSTEM</span>
+      <span className="mono dim" style={{ fontSize: '0.769rem', marginRight: 10 }}>SYSTEM</span>
       {systems.map(s => (
         <button key={s.sysid}
           className={`sys-btn${sysid === s.sysid ? ' sys-btn--active' : ''}`}
           onClick={() => setSysid(s.sysid)}>
           {s.short_name || s.name || s.sysid}
-          <span className="mono" style={{ marginLeft: 6, fontSize: 9, opacity: 0.5 }}>{s.sysid}</span>
+          <span className="mono" style={{ marginLeft: 6, fontSize: '0.692rem', opacity: 0.5 }}>{s.sysid}</span>
         </button>
       ))}
     </div>
@@ -428,6 +434,7 @@ export default function App() {
   const [sysDetail,  setSysDetail]  = useState(null);
   const [audioCallId, setAudioCallId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('jitr-theme') || 'night');
+  const [fontSize, setFontSize] = useState(() => localStorage.getItem('jitr-font-size') || 'normal');
   const sysidRef = useRef(sysid);
   useEffect(() => { sysidRef.current = sysid; }, [sysid]);
 
@@ -436,6 +443,16 @@ export default function App() {
     localStorage.setItem('jitr-theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(t => t === 'day' ? 'night' : 'day');
+
+  useEffect(() => {
+    document.documentElement.dataset.fontSize = fontSize;
+    localStorage.setItem('jitr-font-size', fontSize);
+  }, [fontSize]);
+  const FONT_SIZE_CYCLE = ['small', 'normal', 'large', 'xlarge'];
+  const cycleFontSize = () => setFontSize(f => {
+    const i = FONT_SIZE_CYCLE.indexOf(f);
+    return FONT_SIZE_CYCLE[(i + 1) % FONT_SIZE_CYCLE.length];
+  });
 
   // ── Socket events ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -607,7 +624,8 @@ export default function App() {
     <div className="app">
       <Nav page={page} setPage={setPage} connected={connected}
         activeCount={active.length} emergencyCount={emergency.length}
-        theme={theme} toggleTheme={toggleTheme} />
+        theme={theme} toggleTheme={toggleTheme}
+        fontSize={fontSize} cycleFontSize={cycleFontSize} />
       <SysBar systems={systems} sysid={sysid} setSysid={setSysid} />
       {renderPage()}
       {audioCallId && <AudioBar callId={audioCallId} onClose={() => setAudioCallId(null)} />}
