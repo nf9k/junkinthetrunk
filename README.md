@@ -4,6 +4,8 @@ Docker/Podman-based APCO P25 trunked radio monitor.
 
 Decodes P25 Phase 1 & 2 control channels via RTL-SDR, stores call records in PostgreSQL, and streams live activity to a React web UI over WebSocket.
 
+Full operator guide: [`docs/user-manual.md`](docs/user-manual.md) ([PDF](docs/user-manual.pdf))
+
 ## Stack
 
 | Service | Image / Source | Role |
