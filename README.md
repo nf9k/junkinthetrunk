@@ -39,10 +39,11 @@ $EDITOR .env   # set DB_PASSWORD
 # 4. Configure decoder
 $EDITOR config/trunk-recorder.json   # set sysId, control_channel_list
 
-# 5. Drop RadioReference talkgroup CSV into config/talkgroups/
-#    RadioReference → Database → <your system> → Export → Talkgroups
-#    Rename to <sysid>.csv — e.g. 1B6.csv — so auto-import knows which system.
-cp ~/Downloads/your-system-talkgroups.csv config/talkgroups/1B6.csv
+# 5. Drop RadioReference exports into config/talkgroups/ named by sysid:
+#      <sysid>.csv        — talkgroups (classic or trs_tg_NNNN.csv)
+#      <sysid>.sites.csv  — sites (trs_sites_NNNN.csv)
+cp ~/Downloads/trs_tg_5737.csv    config/talkgroups/262.csv
+cp ~/Downloads/trs_sites_5737.csv config/talkgroups/262.sites.csv
 
 # 6. Launch
 docker compose up -d      # or: podman compose up -d
@@ -51,25 +52,43 @@ docker compose up -d      # or: podman compose up -d
 Web UI: **http://localhost:8080**
 API: **http://localhost:3000/api**
 
-## Talkgroup Import
+## Talkgroup & Site Import
 
-CSVs in `config/talkgroups/` named `<sysid>.csv` (e.g. `1B6.csv`) are
-auto-imported every time the API container starts. The filename (minus
-`.csv`) is upper-cased and used as the sysid; files that don't match that
-pattern are ignored. The RadioReference export format is the expected
-input — columns used: `Decimal`, `Alpha Tag`, `Description`, `Group`,
-`Encrypted`.
+CSVs in `config/talkgroups/` are auto-imported every time the API
+container starts. The filename determines what they are and which
+P25 system they belong to:
 
-Imports are idempotent (upsert on `(sysid, tgid)`), so re-dropping an
-updated CSV and restarting `api` is the normal refresh flow:
+| Pattern | Ingested as | Example |
+|---|---|---|
+| `<sysid>.csv` | Talkgroups | `262.csv` (MESA), `6BD.csv` (SAFE-T) |
+| `<sysid>.sites.csv` | Sites + frequencies | `262.sites.csv` |
+
+The filename `<sysid>` is upper-cased and used as the P25 system ID;
+anything else in the directory is logged and skipped. Two RadioReference
+export shapes are supported for talkgroups:
+
+- **Classic** (per-system export): `Decimal, Alpha Tag, Description, Tag, Group, Mode, Encrypted`
+- **TRS** (`trs_tg_NNNN.csv` dumps): `Decimal, Hex, Alpha Tag, Mode, Description, Tag, Category`
+
+Both are auto-detected. For TRS exports, encryption is inferred from
+`Mode` (`D` = clear, `De` or `DE` = encrypted).
+
+Sites come from RR's `trs_sites_NNNN.csv` dump — all fixed columns plus
+a variable-length `Frequencies` tail. Control channels (trailing `c`
+suffix) and voice channels are split into `control_freqs[]` and
+`voice_freqs[]` in the `sites` table.
+
+Imports are idempotent (upsert on `(sysid, tgid)` for talkgroups,
+`(sysid, rfss_id, site_id)` for sites), so the refresh flow is:
 
 ```bash
-cp ~/Downloads/new-talkgroups.csv config/talkgroups/1B6.csv
+# RadioReference → Premium Subscriber → Database → Trunked System → Export
+cp ~/Downloads/trs_tg_5737.csv    config/talkgroups/262.csv
+cp ~/Downloads/trs_sites_5737.csv config/talkgroups/262.sites.csv
 docker compose restart api
 ```
 
-For ad-hoc JSON imports via the REST API, `POST /api/talkgroups/import`
-is still available — see the API section below.
+`POST /api/talkgroups/import` remains available for ad-hoc JSON imports.
 
 ## MQTT Topic Structure
 
@@ -121,7 +140,8 @@ junkinthetrunk/
 │   ├── trunk-recorder.json       ← edit: sysId, frequencies, dongle serials
 │   ├── mosquitto.conf
 │   └── talkgroups/
-│       └── 1B6.csv               ← <sysid>.csv — auto-imported on API startup
+│       ├── 262.csv               ← <sysid>.csv — auto-imported on API startup
+│       └── 262.sites.csv         ← <sysid>.sites.csv — sites + frequencies
 ├── db/
 │   └── init.sql                  ← full schema + upsert_system() function
 ├── api/

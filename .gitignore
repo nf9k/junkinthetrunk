@@ -8,3 +8,17 @@ build/
 .DS_Store
 .vscode/
 .idea/
+.env
+.claude/
+__pycache__/
+*.pyc
+*.pyo
+legacy_data/
+stub_users.txt
+docs/security/Makefile
+docs/security/tools/
+
+# RadioReference exports are subscriber-licensed — keep them local.
+config/talkgroups/*.csv
+!config/talkgroups/example.csv
+!config/talkgroups/example.sites.csv

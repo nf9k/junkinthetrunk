@@ -1,0 +1,3 @@
+RFSS,Site Dec,Site Hex,Site NAC,Description,County Name,Lat,Lon,Range,Frequencies
+1,001,1,123,"Example County Main Simulcast","Example",40.000000,-86.000000,25,851.000000c,851.500000,852.000000,852.500000c,853.000000,853.500000
+1,002,2,124,"Example County South Simulcast","Example",39.500000,-86.250000,18,854.000000c,854.500000,855.000000,855.500000c

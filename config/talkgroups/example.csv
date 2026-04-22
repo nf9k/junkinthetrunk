@@ -1,0 +1,6 @@
+Decimal,Hex,Alpha Tag,Mode,Description,Tag,Category
+1001,3E9,"EX-LAW-DISP","D","Example dispatch channel","Law Dispatch","Example County"
+1002,3EA,"EX-LAW-TAC","DE","Always-encrypted tactical","Law Tac","Example County"
+2001,7D1,"EX-FIRE-DISP","D","Example fire dispatch","Fire Dispatch","Example County"
+2002,7D2,"EX-FIRE-TAC","De","Sometimes-encrypted fire ops","Fire-Tac","Example County"
+3001,BB9,"EX-EMS-DISP","D","Example EMS dispatch","EMS Dispatch","Example County"

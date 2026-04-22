@@ -15,9 +15,11 @@ Personal homelab project, not on code.roche.com.
 - compose.yml (not docker-compose.yml, not compose.yaml)
 - No npm workspaces — api/ and frontend/ are independent packages
 - MQTT prefix is `jitr` — must match MQTT_TOPIC_PREFIX in compose.yml and trunk-recorder.json
-- sysid is always uppercase hex (e.g. "1B6"), normalized in mqtt.js
+- sysid is always uppercase hex (e.g. "262" for MESA, "6BD" for SAFE-T), normalized in mqtt.js
 - WebSocket events: `active:snapshot`, `call:start`, `call:end`, `rates`
 - DB: PostgreSQL user/db both named `jitr`
+- Talkgroup CSVs: `<sysid>.csv`; site CSVs: `<sysid>.sites.csv` — both auto-imported on API start
+- `sites` table is UNIQUE(sysid, rfss_id, site_id) — RFSS matters (SAFE-T has 2 RFSSes sharing site ids)
 
 ## File layout
 - compose.yml — all 5 services, named volumes

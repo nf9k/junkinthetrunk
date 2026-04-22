@@ -3,36 +3,39 @@
 
   "sources": [
     {
-      "center":  851000000,
+      "center":  858000000,
       "rate":    2400000,
       "error":   0,
       "gain":    40,
       "squelch": -60,
       "driver":  "osmosdr",
       "device":  "rtl=serial:TRUNK0",
-      "antenna": "SDR #0 — control channel"
+      "antenna": "SDR #0 — MESA Hamilton Co. (site 3, NAC 264)"
     },
     {
-      "center":  856000000,
+      "center":  857000000,
       "rate":    2400000,
       "error":   0,
       "gain":    40,
       "squelch": -60,
       "driver":  "osmosdr",
       "device":  "rtl=serial:TRUNK1",
-      "antenna": "SDR #1 — voice follow"
+      "antenna": "SDR #1 — MESA Marion Co. Public Safety (site A, NAC 261)"
     }
   ],
 
   "systems": [
     {
-      "shortName":            "hamilton-co",
+      "shortName":            "mesa",
       "type":                 "p25",
-      "sysId":                "1B6",
-      "control_channel_list": [851412500, 851887500, 852587500],
+      "sysId":                "262",
+      "control_channel_list": [
+        856812500, 857812500, 858812500, 859812500,
+        858187500, 856512500, 856162500, 857662500
+      ],
       "recordUnknown":        false,
       "bandplan":             "rebanded800",
-      "talkgroupsFile":       "/app/talkgroups/hamilton-co.csv",
+      "talkgroupsFile":       "/app/talkgroups/262.csv",
       "audioArchive":         true,
       "callTimeout":          3
     }
@@ -53,9 +56,12 @@
   "statusServer": false,
 
   "_notes": [
-    "device: rtl=serial:TRUNK0 — set with: rtl_eeprom -d 0 -s TRUNK0",
-    "sysId: P25 System ID in hex — find on radioreference.com",
-    "bandplan: rebanded800 for post-reband 800 MHz systems",
+    "sysId 262 = MESA (Metropolitan Emergency Services, Indy metro).",
+    "Source #0 centered at 858 MHz covers Hamilton Co. control channels (856.8125–859.8125 MHz), NAC 264.",
+    "Source #1 centered at 857 MHz covers Marion Co. Public Safety control channels (856.1625–858.1875 MHz), NAC 261.",
+    "Hamilton control channels listed first — trunk-recorder tries them in order; Marion PS is the fallback set.",
+    "To switch to Indiana SAFE-T (sysId 6BD), point talkgroupsFile to /app/talkgroups/6BD.csv and rebuild control_channel_list from 6BD.sites.csv.",
+    "device: rtl=serial:TRUNK0 — set once per dongle: rtl_eeprom -d 0 -s TRUNK0",
     "MQTT topic 'jitr' must match MQTT_TOPIC_PREFIX in compose.yml"
   ]
 }

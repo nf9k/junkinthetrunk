@@ -19,13 +19,20 @@ CREATE TABLE systems (
 -- ─── Sites ────────────────────────────────────────────────────────────────────
 
 CREATE TABLE sites (
-    id            SERIAL       PRIMARY KEY,
-    sysid         VARCHAR(16)  NOT NULL REFERENCES systems(sysid) ON DELETE CASCADE,
-    site_id       INTEGER      NOT NULL,
-    rfss_id       INTEGER,
-    control_freq  BIGINT,
-    last_seen     TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    UNIQUE(sysid, site_id)
+    id             SERIAL       PRIMARY KEY,
+    sysid          VARCHAR(16)  NOT NULL REFERENCES systems(sysid) ON DELETE CASCADE,
+    site_id        INTEGER      NOT NULL,           -- decimal site id
+    rfss_id        INTEGER,
+    nac            VARCHAR(8),                      -- P25 site NAC (hex)
+    description    TEXT,
+    county         TEXT,
+    lat            NUMERIC(9,6),
+    lon            NUMERIC(10,6),
+    range_mi       INTEGER,
+    control_freqs  BIGINT[]     NOT NULL DEFAULT '{}',  -- Hz, primary first
+    voice_freqs    BIGINT[]     NOT NULL DEFAULT '{}',  -- Hz
+    last_seen      TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    UNIQUE(sysid, rfss_id, site_id)
 );
 
 CREATE INDEX idx_sites_sysid ON sites(sysid);
