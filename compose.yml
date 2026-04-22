@@ -3,7 +3,10 @@ name: junk-in-the-trunk
 services:
 
   trunk-recorder:
-    image: ghcr.io/robotastic/trunk-recorder:latest
+    build:
+      context: ./decoder
+      dockerfile: Dockerfile
+    image: jitr-trunk-recorder:local
     container_name: jitr-decoder
     privileged: true
     devices:

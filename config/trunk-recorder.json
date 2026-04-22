@@ -26,42 +26,47 @@
 
   "systems": [
     {
-      "shortName":            "mesa",
-      "type":                 "p25",
-      "sysId":                "262",
-      "control_channel_list": [
+      "shortName":        "262",
+      "type":             "p25",
+      "sysId":            610,
+      "control_channels": [
         856812500, 857812500, 858812500, 859812500,
         858187500, 856512500, 856162500, 857662500
       ],
-      "recordUnknown":        false,
-      "bandplan":             "rebanded800",
-      "talkgroupsFile":       "/app/talkgroups/262.csv",
-      "audioArchive":         true,
-      "callTimeout":          3
+      "recordUnknown":    false,
+      "bandplan":         "rebanded800",
+      "talkgroupsFile":   "/app/talkgroups/262.csv",
+      "audioArchive":     true,
+      "callTimeout":      3
     }
   ],
 
   "plugins": [
     {
-      "name":    "MQTT System",
-      "library": "libmqtt_uploader_plugin.so",
-      "broker":  "tcp://mosquitto:1883",
-      "topic":   "jitr",
-      "qos":     0
+      "name":       "MQTT Status",
+      "library":    "libmqtt_status_plugin.so",
+      "broker":     "tcp://mosquitto:1883",
+      "topic":      "jitr",
+      "client_id":  "jitr-decoder",
+      "mqtt_audio": false,
+      "qos":        0
     }
   ],
 
-  "captureDir":   "/app/audio",
-  "logFile":      false,
-  "statusServer": false,
+  "captureDir": "/app/audio",
+  "logFile":    false,
 
   "_notes": [
-    "sysId 262 = MESA (Metropolitan Emergency Services, Indy metro).",
-    "Source #0 centered at 858 MHz covers Hamilton Co. control channels (856.8125–859.8125 MHz), NAC 264.",
-    "Source #1 centered at 857 MHz covers Marion Co. Public Safety control channels (856.1625–858.1875 MHz), NAC 261.",
-    "Hamilton control channels listed first — trunk-recorder tries them in order; Marion PS is the fallback set.",
-    "To switch to Indiana SAFE-T (sysId 6BD), point talkgroupsFile to /app/talkgroups/6BD.csv and rebuild control_channel_list from 6BD.sites.csv.",
+    "shortName '262' is the P25 hex sysid (MESA). Our API keys the DB on",
+    "  sys_name from MQTT messages, so shortName must equal the hex sysid.",
+    "sysId must be decimal per trunk-recorder v5.x: 0x262 = 610, 0x6BD = 1725.",
+    "Source #0 centered at 858 MHz covers Hamilton control channels, NAC 264.",
+    "Source #1 centered at 857 MHz covers Marion Co. Public Safety, NAC 261.",
+    "Hamilton control channels listed first — tried in order; Marion PS is fallback.",
+    "To switch to Indiana SAFE-T (sysid 6BD / decimal 1725), update shortName,",
+    "  sysId, talkgroupsFile, and control_channels from config/talkgroups/6BD.sites.csv.",
     "device: rtl=serial:TRUNK0 — set once per dongle: rtl_eeprom -d 0 -s TRUNK0",
-    "MQTT topic 'jitr' must match MQTT_TOPIC_PREFIX in compose.yml"
+    "MQTT plugin: libmqtt_status_plugin.so is built into the jitr-trunk-recorder:local",
+    "  image (see decoder/Dockerfile). The stock ghcr.io image does NOT include it."
   ]
 }

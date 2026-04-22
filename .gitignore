@@ -22,3 +22,6 @@ docs/security/tools/
 config/talkgroups/*.csv
 !config/talkgroups/example.csv
 !config/talkgroups/example.sites.csv
+
+# Local trunk-recorder config variants (single-dongle test, etc.)
+config/trunk-recorder.local.json

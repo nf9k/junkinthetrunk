@@ -16,24 +16,34 @@ function mhz(hz) {
   return hz ? (hz / 1e6).toFixed(4) + ' MHz' : null;
 }
 
+// tr-plugin-mqtt messages don't carry the P25 sysid (hex) — only sys_name
+// (the trunk-recorder `shortName` from config) and sys_num (internal).
+// Convention: set `shortName` in trunk-recorder.json to the hex sysid
+// ("262", "6BD"), and we use it directly as the DB sysid key.
+function sysidFrom(payload) {
+  const { sys_name, sys_num } = payload;
+  if (sys_name) return String(sys_name).toUpperCase();
+  if (sys_num != null) return `SYS${sys_num}`;
+  return null;
+}
+
 // ── trunk-recorder MQTT message handlers ─────────────────────────────────────
 
 async function handleCallStart(payload) {
+  // tr-plugin-mqtt wraps the call in a nested `call` object with a type/timestamp envelope
+  const call = payload.call || payload;
   const {
-    sys_name, sys_num, sysid, wacn, nac,
     talkgroup, talkgroup_alpha_tag, talkgroup_group,
-    unit, freq, emergency, encrypted, phase
-  } = payload;
+    unit, freq, emergency, encrypted, phase2_tdma,
+  } = call;
 
-  const sid = sysid ? String(sysid).toUpperCase() : `SYS${sys_num}`;
+  const sid = sysidFrom(call);
+  if (!sid) return;
 
-  // Ensure system row exists
-  await query(
-    `SELECT upsert_system($1, $2, $3, $4)`,
-    [sid, sys_name || sid, wacn ? String(wacn).toUpperCase() : null, nac || null]
-  );
+  const phase = phase2_tdma ? 2 : 1;
 
-  // Upsert talkgroup
+  await query(`SELECT upsert_system($1, $2)`, [sid, call.sys_name || sid]);
+
   if (talkgroup != null) {
     await query(`
       INSERT INTO talkgroups(sysid, tgid, alpha_tag, group_tag, encrypted)
@@ -47,18 +57,15 @@ async function handleCallStart(payload) {
     `, [sid, talkgroup, talkgroup_alpha_tag || null, talkgroup_group || null, !!encrypted]);
   }
 
-  // Insert active call
   const { rows } = await query(`
     INSERT INTO active_calls(sysid, tgid, alpha_tag, group_tag, source_unit, freq, emergency, encrypted, phase)
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
     RETURNING id
   `, [sid, talkgroup, talkgroup_alpha_tag || null, talkgroup_group || null,
-      unit || null, freq || null, !!emergency, !!encrypted, phase || 1]);
+      (unit && unit > 0) ? unit : null, freq || null, !!emergency, !!encrypted, phase]);
 
-  const activeId = rows[0].id;
-
-  const event = {
-    id: activeId,
+  emit('call:start', {
+    id: rows[0].id,
     sysid: sid,
     tgid: talkgroup,
     alpha_tag: talkgroup_alpha_tag,
@@ -68,19 +75,18 @@ async function handleCallStart(payload) {
     freq_label: mhz(freq),
     emergency: !!emergency,
     encrypted: !!encrypted,
-    phase: phase || 1,
+    phase,
     start_time: new Date().toISOString(),
-  };
-
-  emit('call:start', event);
+  });
   console.log(`[call:start] ${sid} TG${talkgroup} (${talkgroup_alpha_tag || '?'}) ${mhz(freq)}`);
 }
 
 async function handleCallEnd(payload) {
-  const { sysid, sys_num, talkgroup, freq, length, audio_type, filename } = payload;
-  const sid = sysid ? String(sysid).toUpperCase() : `SYS${sys_num}`;
+  const call = payload.call || payload;
+  const { talkgroup, freq, length, call_filename } = call;
+  const sid = sysidFrom(call);
+  if (!sid) return;
 
-  // Write to permanent calls table
   const { rows } = await query(`
     INSERT INTO calls(sysid, tgid, freq, duration, audio_file)
     SELECT sysid, tgid, freq, $3, $4
@@ -89,50 +95,49 @@ async function handleCallEnd(payload) {
     ORDER  BY start_time DESC
     LIMIT  1
     RETURNING id
-  `, [sid, talkgroup, length || null, filename || null]);
+  `, [sid, talkgroup, length || null, call_filename || null]);
 
-  // Remove from active
   await query(
     `DELETE FROM active_calls WHERE sysid=$1 AND tgid=$2`,
     [sid, talkgroup]
   );
 
-  const event = {
+  emit('call:end', {
     sysid: sid,
     tgid: talkgroup,
     freq,
     duration: length,
     call_id: rows[0]?.id,
-    has_audio: !!filename,
-  };
-
-  emit('call:end', event);
+    has_audio: !!call_filename,
+  });
 }
 
 async function handleRates(payload) {
-  // trunk-recorder rates message — system health / signal stats
+  // tr-plugin-mqtt rates message — control-channel decode telemetry
   emit('rates', payload);
 }
 
 // ── Topic router ──────────────────────────────────────────────────────────────
+//
+// tr-plugin-mqtt publishes to `<topic>/<event>` where <event> is one of
+// call_start, call_end, rates, calls_active, recorder, recorders, config,
+// systems, system. We only consume the first three; others are silently
+// ignored (fine — they're just retained state we don't use yet).
 
 async function dispatch(topic, raw) {
   let payload;
   try {
     payload = JSON.parse(raw.toString());
   } catch {
-    return; // non-JSON message, ignore
+    return;
   }
 
-  // trunk-recorder topics under our prefix:
-  //   jitr/calls/start   jitr/calls/end   jitr/rates   jitr/audio
-  const sub = topic.replace(`${PREFIX}/`, '');
+  const sub = topic.startsWith(`${PREFIX}/`) ? topic.slice(PREFIX.length + 1) : topic;
 
   try {
-    if      (sub === 'calls/start') await handleCallStart(payload);
-    else if (sub === 'calls/end')   await handleCallEnd(payload);
+    if      (sub === 'call_start')  await handleCallStart(payload);
+    else if (sub === 'call_end')    await handleCallEnd(payload);
     else if (sub === 'rates')       await handleRates(payload);
-    // audio chunks: ignored — audio is served from file volume
   } catch (err) {
     console.error(`[mqtt] handler error for ${topic}:`, err.message);
   }
