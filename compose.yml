@@ -92,13 +92,13 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: jitr-frontend:local
       args:
         # Empty default → frontend uses same-origin and nginx proxies
         # /api and /socket.io to the api container internally. Override
         # only if you're serving the UI from a host that can't reach the
         # api via relative URLs (rare).
         - VITE_API_URL=${VITE_API_URL:-}
+    image: jitr-frontend:local
     container_name: jitr-ui
     ports:
       - "8080:80"
