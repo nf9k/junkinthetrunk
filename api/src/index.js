@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const cors       = require('cors');
 const mqtt       = require('./mqtt');
 const { query }  = require('./db');
+const { importTalkgroupsFromDisk } = require('./import');
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -96,8 +97,9 @@ setInterval(cleanStaleActive, 60_000);
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`[api] Junk in the Trunk API listening on :${PORT}`);
+  await importTalkgroupsFromDisk();
   mqtt.connect(io);
   refreshStats();
 });

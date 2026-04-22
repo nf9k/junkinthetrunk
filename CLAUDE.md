@@ -27,6 +27,7 @@ Personal homelab project, not on code.roche.com.
 - db/init.sql — full schema + upsert_system() function
 - api/src/index.js — Express + Socket.IO + 60s stats refresh + stale active call cleanup
 - api/src/mqtt.js — trunk-recorder event handler (handleCallStart/End/Rates)
+- api/src/import.js — talkgroup CSV auto-import on startup (<sysid>.csv convention)
 - api/src/routes/ — systems.js, calls.js, talkgroups.js, units.js
 - frontend/src/App.jsx — all UI (Dashboard, Call Log, Talkgroups, Units)
 - frontend/src/styles/global.css — CSS variables + all component classes
@@ -35,5 +36,5 @@ Personal homelab project, not on code.roche.com.
 ## What's not done yet
 - ntfy push alerts on emergency calls
 - Audio playback waveform in UI
-- Talkgroup CSV auto-import on API startup
+- Live RadioReference SOAP API import (blocked on RR appKey request)
 - Phase 2 (TDMA) multi-site handling

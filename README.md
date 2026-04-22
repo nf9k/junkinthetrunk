@@ -41,7 +41,8 @@ $EDITOR config/trunk-recorder.json   # set sysId, control_channel_list
 
 # 5. Drop RadioReference talkgroup CSV into config/talkgroups/
 #    RadioReference → Database → <your system> → Export → Talkgroups
-cp ~/Downloads/your-system-talkgroups.csv config/talkgroups/
+#    Rename to <sysid>.csv — e.g. 1B6.csv — so auto-import knows which system.
+cp ~/Downloads/your-system-talkgroups.csv config/talkgroups/1B6.csv
 
 # 6. Launch
 docker compose up -d      # or: podman compose up -d
@@ -52,32 +53,23 @@ API: **http://localhost:3000/api**
 
 ## Talkgroup Import
 
-After startup, import a talkgroup CSV via the API:
+CSVs in `config/talkgroups/` named `<sysid>.csv` (e.g. `1B6.csv`) are
+auto-imported every time the API container starts. The filename (minus
+`.csv`) is upper-cased and used as the sysid; files that don't match that
+pattern are ignored. The RadioReference export format is the expected
+input — columns used: `Decimal`, `Alpha Tag`, `Description`, `Group`,
+`Encrypted`.
+
+Imports are idempotent (upsert on `(sysid, tgid)`), so re-dropping an
+updated CSV and restarting `api` is the normal refresh flow:
 
 ```bash
-# Parse RadioReference CSV export and post as JSON
-python3 - <<'EOF'
-import csv, json, requests, sys
-
-SYSID = "1B6"   # your system ID in hex
-CSV   = "config/talkgroups/hamilton-co.csv"
-
-tgs = []
-with open(CSV) as f:
-    for row in csv.DictReader(f):
-        tgs.append({
-            "tgid":        int(row["Decimal"]),
-            "alpha_tag":   row["Alpha Tag"],
-            "description": row["Description"],
-            "group_tag":   row["Group"],
-            "encrypted":   row["Encrypted"] == "1",
-        })
-
-r = requests.post(f"http://localhost:3000/api/talkgroups/import",
-                  json={"sysid": SYSID, "rows": tgs})
-print(r.json())
-EOF
+cp ~/Downloads/new-talkgroups.csv config/talkgroups/1B6.csv
+docker compose restart api
 ```
+
+For ad-hoc JSON imports via the REST API, `POST /api/talkgroups/import`
+is still available — see the API section below.
 
 ## MQTT Topic Structure
 
@@ -129,7 +121,7 @@ junk-in-the-trunk/
 │   ├── trunk-recorder.json       ← edit: sysId, frequencies, dongle serials
 │   ├── mosquitto.conf
 │   └── talkgroups/
-│       └── hamilton-co.csv       ← replace with RadioReference export(s)
+│       └── 1B6.csv               ← <sysid>.csv — auto-imported on API startup
 ├── db/
 │   └── init.sql                  ← full schema + upsert_system() function
 ├── api/
@@ -138,6 +130,7 @@ junk-in-the-trunk/
 │   └── src/
 │       ├── index.js              ← Express + Socket.IO + stats refresh
 │       ├── mqtt.js               ← trunk-recorder event subscriber
+│       ├── import.js             ← talkgroup CSV auto-import (startup)
 │       ├── db.js                 ← pg pool
 │       └── routes/
 │           ├── systems.js
