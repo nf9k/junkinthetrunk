@@ -992,6 +992,117 @@ body::before {
 }
 .btn-audio:hover { background: rgba(232,130,12,0.25); }
 
+/* ── Site Info page ─────────────────────────────────────────────────────────── */
+
+.site-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 12px;
+}
+
+.site-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.site-card--current {
+  border-color: var(--amber-dim);
+  box-shadow: 0 0 0 1px var(--amber-dim), 0 0 24px var(--amber-glow);
+}
+
+.site-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.site-card__title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.site-card__geo { text-align: right; line-height: 1.5; }
+.site-card__maplink {
+  color: var(--blue);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--blue-dim);
+}
+.site-card__maplink:hover { color: var(--amber); border-color: var(--amber-dim); }
+
+.site-card__channels-label {
+  letter-spacing: 0.12em;
+  margin-bottom: 4px;
+}
+
+.freq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.freq-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+.freq-chip--ctrl {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+  background: var(--amber-glow);
+}
+.freq-chip--primary {
+  border-width: 2px;
+  font-weight: bold;
+}
+
+.badge--live {
+  background: var(--green);
+  color: var(--bg-base);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.1em;
+}
+
+.sdr-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.sdr-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.sdr-card__title {
+  font-size: 13px;
+  color: var(--amber);
+  margin-bottom: 8px;
+}
+.sdr-card__stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.sdr-card__stats > div { display: flex; justify-content: space-between; }
+.sdr-card__stats .xs { font-size: 10px; letter-spacing: 0.08em; }
+.sdr-card__antenna { margin-top: 8px; font-style: italic; }
+
 /* ── Utility aliases ─────────────────────────────────────────────────────────── */
 
 .mono  { font-family: var(--font-mono); }

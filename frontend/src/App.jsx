@@ -177,7 +177,7 @@ function Stat({ label, value, alert }) {
 }
 
 // ── Nav ───────────────────────────────────────────────────────────────────────
-const PAGES = ['Dashboard', 'Call Log', 'Talkgroups', 'Units'];
+const PAGES = ['Dashboard', 'Call Log', 'Talkgroups', 'Units', 'Site Info'];
 
 function Nav({ page, setPage, connected, activeCount, emergencyCount, theme, toggleTheme }) {
   return (
@@ -250,6 +250,170 @@ function Tbl({ cols, children, empty }) {
   );
 }
 
+// ── Site Info page ────────────────────────────────────────────────────────────
+
+function SiteCard({ site, isCurrent }) {
+  const ctrl = site.control_freqs || [];
+  const voice = site.voice_freqs || [];
+  return (
+    <div className={`site-card${isCurrent ? ' site-card--current' : ''}`}>
+      <div className="site-card__header">
+        <div>
+          <div className="site-card__title">
+            {site.description || `Site ${site.site_id}`}
+            {isCurrent && <span className="badge badge--live">DECODING</span>}
+          </div>
+          <div className="mono dim xs" style={{ marginTop: 2 }}>
+            RFSS {site.rfss_id} · Site {site.site_id} (0x{site.site_id?.toString(16).toUpperCase()}) · NAC {site.nac || '—'}
+          </div>
+        </div>
+        <div className="site-card__geo mono dim xs">
+          {site.county && <div>{site.county} Co.</div>}
+          {site.range_mi && <div>{site.range_mi} mi</div>}
+          {(site.lat && site.lon) && (
+            <a className="site-card__maplink" target="_blank" rel="noreferrer"
+              href={`https://www.openstreetmap.org/?mlat=${site.lat}&mlon=${site.lon}&zoom=12`}>
+              {Number(site.lat).toFixed(3)},{Number(site.lon).toFixed(3)}
+            </a>
+          )}
+        </div>
+      </div>
+
+      <div className="site-card__channels">
+        <div className="site-card__channels-label mono dim xs">
+          CONTROL · {ctrl.length}
+        </div>
+        <div className="freq-chips">
+          {ctrl.map((hz, i) => (
+            <span key={hz} className={`freq-chip freq-chip--ctrl${i === 0 ? ' freq-chip--primary' : ''}`}>
+              {fmtFreq(hz)}
+            </span>
+          ))}
+        </div>
+
+        <div className="site-card__channels-label mono dim xs" style={{ marginTop: 8 }}>
+          VOICE · {voice.length}
+        </div>
+        <div className="freq-chips">
+          {voice.map(hz => (
+            <span key={hz} className="freq-chip">{fmtFreq(hz)}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SiteInfoPage({ detail }) {
+  if (!detail) {
+    return <div className="page"><div className="scanning mono dim">— LOADING —</div></div>;
+  }
+
+  const sources   = detail.sdr_sources_json || [];
+  const recorders = detail.recorders_json   || [];
+  const activeRec = recorders.filter(r => r.rec_state_type && r.rec_state_type !== 'IDLE' && r.rec_state_type !== 'AVAILABLE');
+  const currentSite = detail.current_site_id;
+
+  // Group sites by RFSS for display
+  const byRfss = {};
+  for (const s of detail.sites || []) {
+    (byRfss[s.rfss_id] ??= []).push(s);
+  }
+
+  return (
+    <div className="page">
+      {/* System-level real-time panel */}
+      <div className="section-label mono">SYSTEM
+        <span className="section-count">{detail.sysid}</span>
+      </div>
+      <div className="stat-row">
+        <Stat label="SHORTNAME"    value={detail.short_name || '—'} />
+        <Stat label="WACN"         value={detail.wacn || '—'} />
+        <Stat label="NAC"          value={detail.nac != null ? detail.nac.toString(16).toUpperCase() : '—'} />
+        <Stat label="RFSS"         value={detail.rfss || '—'} />
+        <Stat label="CURRENT SITE" value={currentSite ? `${currentSite} (0x${currentSite.toString(16).toUpperCase()})` : '—'} />
+        <Stat label="CURRENT CC"   value={detail.current_control_freq ? `${fmtFreq(detail.current_control_freq)}` : '—'} />
+        <Stat label="DECODE RATE"  value={detail.current_decode_rate != null ? `${Number(detail.current_decode_rate).toFixed(1)}/s` : '—'} />
+        <Stat label="SQUELCH"      value={detail.squelch_db != null ? `${detail.squelch_db} dB` : '—'} />
+      </div>
+
+      {/* SDR sources */}
+      <div className="section-label mono" style={{ marginTop: 24 }}>
+        SDR SOURCES
+        <span className="section-count">{sources.length}</span>
+      </div>
+      {sources.length === 0 ? (
+        <div className="tbl-empty mono dim" style={{ padding: '12px 0' }}>— no config received yet —</div>
+      ) : (
+        <div className="sdr-grid">
+          {sources.map((src, i) => (
+            <div key={i} className="sdr-card">
+              <div className="sdr-card__title mono">
+                SDR #{src.source_num ?? i} <span className="dim">· {src.device || '—'}</span>
+              </div>
+              <div className="sdr-card__stats">
+                <div><span className="mono dim xs">CENTER</span> {src.center ? fmtFreq(src.center) : '—'} MHz</div>
+                <div><span className="mono dim xs">RATE</span>   {src.rate ? (src.rate / 1e6).toFixed(2) : '—'} MS/s</div>
+                <div><span className="mono dim xs">WINDOW</span> {src.min_hz ? fmtFreq(src.min_hz) : '—'} – {src.max_hz ? fmtFreq(src.max_hz) : '—'} MHz</div>
+                <div><span className="mono dim xs">GAIN</span>   {src.gain != null ? `${src.gain} dB` : '—'}</div>
+              </div>
+              {src.antenna && <div className="sdr-card__antenna mono dim xs">{src.antenna}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Active recorders */}
+      <div className="section-label mono" style={{ marginTop: 24 }}>
+        RECORDERS
+        <span className="section-count">{activeRec.length}/{recorders.length}</span>
+      </div>
+      {recorders.length === 0 ? (
+        <div className="tbl-empty mono dim" style={{ padding: '12px 0' }}>— no recorders reporting yet —</div>
+      ) : (
+        <Tbl cols={['#', 'State', 'TG', 'Freq', 'Duration']} empty={null}>
+          {recorders.map((r, i) => (
+            <tr key={i} className="tbl-row">
+              <td className="mono xs">{r.rec_num ?? i}</td>
+              <td className="mono xs">
+                <span style={{ color: r.rec_state_type === 'RECORDING' ? 'var(--green)' : 'var(--text-muted)' }}>
+                  {r.rec_state_type || '—'}
+                </span>
+              </td>
+              <td className="mono xs">{r.current_tgid || '—'}</td>
+              <td className="mono xs">{r.current_freq ? fmtFreq(r.current_freq) : '—'}</td>
+              <td className="mono xs">{r.current_length != null ? fmtDur(r.current_length) : '—'}</td>
+            </tr>
+          ))}
+        </Tbl>
+      )}
+
+      {/* Sites — grouped by RFSS */}
+      <div className="section-label mono" style={{ marginTop: 24 }}>
+        SITES
+        <span className="section-count">{detail.sites?.length || 0}</span>
+      </div>
+      {(!detail.sites || detail.sites.length === 0) ? (
+        <div className="tbl-empty mono dim" style={{ padding: '12px 0' }}>
+          — no sites — drop a &lt;sysid&gt;.sites.csv in config/talkgroups/ —
+        </div>
+      ) : Object.keys(byRfss).sort().map(rfssId => (
+        <div key={rfssId} style={{ marginBottom: 18 }}>
+          <div className="mono dim xs" style={{ margin: '10px 0 8px', letterSpacing: '0.1em' }}>
+            ── RFSS {rfssId} · {byRfss[rfssId].length} SITE{byRfss[rfssId].length !== 1 ? 'S' : ''} ──
+          </div>
+          <div className="site-grid">
+            {byRfss[rfssId].map(site => (
+              <SiteCard key={site.id} site={site}
+                isCurrent={currentSite === site.site_id} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [page,       setPage]       = useState('Dashboard');
@@ -261,6 +425,7 @@ export default function App() {
   const [talkgroups, setTalkgroups] = useState([]);
   const [units,      setUnits]      = useState([]);
   const [spark,      setSpark]      = useState([]);
+  const [sysDetail,  setSysDetail]  = useState(null);
   const [audioCallId, setAudioCallId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('jitr-theme') || 'night');
   const sysidRef = useRef(sysid);
@@ -323,6 +488,10 @@ export default function App() {
     try { setSpark(await api(`/api/systems/${sid}/stats?hours=24`)); } catch { }
   }, []);
 
+  const fetchSysDetail = useCallback(async (sid) => {
+    try { setSysDetail(await api(`/api/systems/${sid}`)); } catch { }
+  }, []);
+
   // Initial load + polling
   useEffect(() => {
     fetchSystems();
@@ -338,7 +507,15 @@ export default function App() {
     if (page === 'Call Log')   fetchCalls(sysid);
     if (page === 'Talkgroups') fetchTalkgroups(sysid);
     if (page === 'Units')      fetchUnits(sysid);
+    if (page === 'Site Info')  fetchSysDetail(sysid);
   }, [sysid, page]);
+
+  // Site Info realtime fields (current CC, decode rate, recorders) — poll every 3s.
+  useEffect(() => {
+    if (page !== 'Site Info' || !sysid) return;
+    const t = setInterval(() => fetchSysDetail(sysid), 3000);
+    return () => clearInterval(t);
+  }, [page, sysid, fetchSysDetail]);
 
   const sys          = systems.find(s => s.sysid === sysid);
   const emergency    = active.filter(c => c.emergency);
@@ -419,6 +596,8 @@ export default function App() {
           </Tbl>
         </div>
       );
+
+      case 'Site Info': return <SiteInfoPage detail={sysDetail} />;
 
       default: return null;
     }

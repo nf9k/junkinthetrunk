@@ -165,8 +165,96 @@ async function handleCallsActive(payload) {
   for (const [key, val] of current) lastSeenCallNums.set(key, val);
 }
 
+// ── System metadata / realtime handlers ─────────────────────────────────────
+
+// Retained message: system discovery. Fills in WACN/NAC/RFSS on the systems
+// row and records which site is currently primary.
+//
+// Caveat: the plugin publishes an ALL-ZERO initial message right after the
+// decoder starts, before it's received a network status TSBK from the
+// control channel. Treat "0" / 0 as sentinels and preserve any existing
+// real values via COALESCE so a later real message isn't clobbered.
+async function handleSystems(payload) {
+  for (const s of payload.systems || []) {
+    const sid = sysidFrom(s);
+    if (!sid) continue;
+
+    const rawWacn = s.wacn != null ? String(s.wacn).trim() : '';
+    const rawNac  = s.nac  != null ? String(s.nac).trim()  : '';
+    const wacn   = (rawWacn && rawWacn !== '0') ? rawWacn.toUpperCase() : null;
+    const nac    = (rawNac  && rawNac  !== '0') ? (parseInt(rawNac, 16) || null) : null;
+    const rfss   = (s.rfss    != null && s.rfss    > 0) ? parseInt(s.rfss, 10)    : null;
+    const siteId = (s.site_id != null && s.site_id > 0) ? parseInt(s.site_id, 10) : null;
+
+    await query(`SELECT upsert_system($1, $2)`, [sid, s.sys_name || sid]);
+
+    await query(`
+      UPDATE systems SET
+        wacn      = COALESCE($2, wacn),
+        nac       = COALESCE($3, nac),
+        rfss      = COALESCE($4, rfss),
+        last_seen = now()
+      WHERE sysid = $1
+    `, [sid, wacn, nac, rfss]);
+
+    await query(`
+      INSERT INTO system_stats(sysid, current_site_id) VALUES ($1, $2)
+      ON CONFLICT (sysid) DO UPDATE
+        SET current_site_id = COALESCE(EXCLUDED.current_site_id, system_stats.current_site_id),
+            updated_at      = now()
+    `, [sid, siteId]);
+  }
+}
+
+// Retained message: full trunk-recorder config. We pluck squelch per system
+// and save the full sources[] array (SDR tuning windows) per system.
+async function handleConfig(payload) {
+  const cfg = payload.config || {};
+  const sources = cfg.sources || [];
+  const sourcesJson = JSON.stringify(sources);
+  for (const sys of cfg.systems || []) {
+    const sid = (sys.sys_name || sys.short_name || sys.shortName || '').toString().toUpperCase();
+    if (!sid) continue;
+    await query(`
+      INSERT INTO system_stats(sysid, squelch_db, sdr_sources_json)
+      VALUES ($1, $2, $3::jsonb)
+      ON CONFLICT (sysid) DO UPDATE
+        SET squelch_db       = EXCLUDED.squelch_db,
+            sdr_sources_json = EXCLUDED.sdr_sources_json,
+            updated_at       = now()
+    `, [sid, sys.squelch_db != null ? Math.round(sys.squelch_db) : null, sourcesJson]);
+  }
+}
+
+// ~every 3s from the plugin. Updates rate + current CC in system_stats.
 async function handleRates(payload) {
+  for (const r of payload.rates || []) {
+    const sid = sysidFrom(r);
+    if (!sid) continue;
+    await query(`
+      INSERT INTO system_stats(sysid, current_control_freq, current_decode_rate)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (sysid) DO UPDATE
+        SET current_control_freq = EXCLUDED.current_control_freq,
+            current_decode_rate  = EXCLUDED.current_decode_rate,
+            updated_at           = now()
+    `, [sid, r.control_channel != null ? Math.round(r.control_channel) : null,
+        r.decoderate != null ? Number(r.decoderate).toFixed(2) : null]);
+  }
   emit('rates', payload);
+}
+
+// Every 3s: snapshot of every recorder's state (idle / recording / ...).
+// Recorders aren't naturally per-system (one SDR serves multiple), so we
+// write the same snapshot to every configured system — good enough for
+// single-system stacks, honest for multi-system.
+async function handleRecorders(payload) {
+  const recorders = payload.recorders || [];
+  await query(`
+    UPDATE system_stats
+       SET recorders_json       = $1::jsonb,
+           recorders_updated_at = now()
+  `, [JSON.stringify(recorders)]);
 }
 
 // ── Unit handlers ────────────────────────────────────────────────────────────
@@ -218,6 +306,9 @@ async function dispatch(topic, raw) {
     else if (sub === 'call_end')        await handleCallEnd(payload);
     else if (sub === 'rates')           await handleRates(payload);
     else if (sub === 'calls_active')    await handleCallsActive(payload);
+    else if (sub === 'systems')         await handleSystems(payload);
+    else if (sub === 'config')          await handleConfig(payload);
+    else if (sub === 'recorders')       await handleRecorders(payload);
     else if (sub.startsWith('units/'))  await handleUnit(payload);
   } catch (err) {
     console.error(`[mqtt] handler error for ${topic}:`, err.message);

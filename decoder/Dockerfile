@@ -10,7 +10,7 @@ ARG TR_REF=master
 ARG PLUGIN_REF=main
 
 # ── Builder ─────────────────────────────────────────────────────────────────
-FROM ubuntu:24.04 AS builder
+FROM debian:trixie AS builder
 
 ARG TR_REF
 ARG PLUGIN_REF
@@ -37,7 +37,7 @@ WORKDIR /src/build
 RUN cmake .. && make -j$(nproc) && make DESTDIR=/newroot install
 
 # ── Runtime ─────────────────────────────────────────────────────────────────
-FROM ubuntu:24.04
+FROM debian:trixie-slim
 
 RUN apt-get update && \
     apt-get -y upgrade && \
@@ -45,11 +45,11 @@ RUN apt-get update && \
     apt-get install --no-install-recommends -y \
       ca-certificates gr-funcube gr-iqbal curl wget docker.io ffmpeg \
       libboost-log1.83.0 libboost-chrono1.83.0t64 \
-      libgnuradio-digital3.10.9t64 libgnuradio-analog3.10.9t64 \
-      libgnuradio-filter3.10.9t64 libgnuradio-network3.10.9t64 \
-      libgnuradio-uhd3.10.9t64 libgnuradio-osmosdr0.2.0t64 \
+      libgnuradio-digital3.10.12 libgnuradio-analog3.10.12 \
+      libgnuradio-filter3.10.12 libgnuradio-network3.10.12 \
+      libgnuradio-uhd3.10.12 libgnuradio-osmosdr0.2.0t64 \
       libsoapysdr0.8 soapysdr0.8-module-all libairspyhf1 libfreesrp0 \
-      librtlsdr2 libxtrx0 libpaho-mqtt1.3 libpaho-mqttpp3-1 && \
+      librtlsdr0 libxtrx0 libpaho-mqtt1.3 libpaho-mqttpp3-1 && \
     rm -rf /var/lib/apt/lists/* && \
     rm -rf /usr/share/{doc,man,info} /usr/local/share/{doc,man,info}
 

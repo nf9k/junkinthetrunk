@@ -19,7 +19,11 @@ router.get('/', async (req, res) => {
 router.get('/:sysid', async (req, res) => {
   const sysid = req.params.sysid.toUpperCase();
   const { rows } = await query(`
-    SELECT s.*, ss.calls_today, ss.calls_hour, ss.active_tgs
+    SELECT s.*,
+           ss.calls_today, ss.calls_hour, ss.active_tgs,
+           ss.current_site_id, ss.current_control_freq, ss.current_decode_rate,
+           ss.squelch_db, ss.sdr_sources_json, ss.recorders_json,
+           ss.recorders_updated_at
     FROM   systems s
     LEFT JOIN system_stats ss ON ss.sysid = s.sysid
     WHERE  s.sysid = $1
@@ -28,7 +32,7 @@ router.get('/:sysid', async (req, res) => {
   const system = rows[0];
 
   const { rows: sites } = await query(
-    `SELECT * FROM sites WHERE sysid=$1 ORDER BY site_id`, [sysid]
+    `SELECT * FROM sites WHERE sysid=$1 ORDER BY rfss_id, site_id`, [sysid]
   );
   system.sites = sites;
   res.json(system);

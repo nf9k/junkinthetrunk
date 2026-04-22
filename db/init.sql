@@ -114,11 +114,19 @@ CREATE INDEX idx_active_sysid ON active_calls(sysid);
 -- ─── System Stats (materialized, refreshed by API) ────────────────────────────
 
 CREATE TABLE system_stats (
-    sysid         VARCHAR(16)  PRIMARY KEY REFERENCES systems(sysid) ON DELETE CASCADE,
-    calls_today   INTEGER      NOT NULL DEFAULT 0,
-    calls_hour    INTEGER      NOT NULL DEFAULT 0,
-    active_tgs    INTEGER      NOT NULL DEFAULT 0,
-    updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+    sysid                 VARCHAR(16)  PRIMARY KEY REFERENCES systems(sysid) ON DELETE CASCADE,
+    calls_today           INTEGER      NOT NULL DEFAULT 0,
+    calls_hour            INTEGER      NOT NULL DEFAULT 0,
+    active_tgs            INTEGER      NOT NULL DEFAULT 0,
+    -- Real-time from tr-plugin-mqtt
+    current_site_id       INTEGER,                  -- from systems retained msg
+    current_control_freq  BIGINT,                   -- from rates msg
+    current_decode_rate   NUMERIC(6,2),             -- msgs/sec on the active CC
+    squelch_db            INTEGER,                  -- from config msg
+    sdr_sources_json      JSONB,                    -- sources[] from config msg
+    recorders_json        JSONB,                    -- recorders[] snapshot (every 3s)
+    recorders_updated_at  TIMESTAMPTZ,
+    updated_at            TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 -- ─── Seed helper function: upsert system on first contact ────────────────────
