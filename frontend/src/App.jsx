@@ -521,6 +521,7 @@ export default function App() {
   const [tgSearch,      setTgSearch]      = useState('');
   const [tgGroupFilter, setTgGroupFilter] = useState('');
   const [tgActiveOnly,  setTgActiveOnly]  = useState(true);
+  const [rrSync,        setRrSync]        = useState(null); // null | 'syncing' | {total} | {error}
   const sysidRef    = useRef(sysid);
   const lockedTgRef = useRef(null);
   useEffect(() => { sysidRef.current = sysid; }, [sysid]);
@@ -538,6 +539,21 @@ export default function App() {
     setScanList(prev => { const n = new Set(prev); n.has(tgid) ? n.delete(tgid) : n.add(tgid); return n; });
   }, []);
   const clearScan = useCallback(() => setScanList(new Set()), []);
+
+  const syncRR = useCallback(async () => {
+    setRrSync('syncing');
+    try {
+      const r = await fetch(`${API}/api/admin/sync-rr`, { method: 'POST' });
+      const data = await r.json();
+      if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      setRrSync({ total: data.total });
+      if (sysidRef.current) fetchTalkgroups(sysidRef.current);
+      setTimeout(() => setRrSync(null), 5000);
+    } catch (err) {
+      setRrSync({ error: err.message });
+      setTimeout(() => setRrSync(null), 8000);
+    }
+  }, [fetchTalkgroups]);
 
   const lockTg = useCallback((call) => {
     // Unlock browser audio on this user gesture so later .play() calls work
@@ -806,12 +822,22 @@ export default function App() {
                   CLEAR
                 </button>
               )}
+              <button className={`btn ${rrSync === 'syncing' ? 'btn-ghost' : 'btn-ghost'}`}
+                style={{ marginLeft: 'auto' }}
+                onClick={syncRR} disabled={rrSync === 'syncing'}>
+                {rrSync === 'syncing' ? '⟳ SYNCING…' : '↓ SYNC RR'}
+              </button>
+              {rrSync && rrSync !== 'syncing' && (
+                <span className="mono xs" style={{ color: rrSync.error ? 'var(--red)' : 'var(--green)' }}>
+                  {rrSync.error ? `✗ ${rrSync.error}` : `✓ ${rrSync.total} talkgroups`}
+                </span>
+              )}
             </div>
             {scanList.size === 0 && (
               <div className="mono dim xs" style={{ marginBottom: 8 }}>Click a row to add it to your scan list — unselected talkgroups will be muted everywhere.</div>
             )}
             <Tbl cols={['Name', 'TGID', 'Group', 'Description', 'Calls', 'Last Active', '']}
-              empty={talkgroups.length === 0 ? 'no talkgroups — import a CSV via API' : visibleTGs.length === 0 ? 'no matches' : null}>
+              empty={talkgroups.length === 0 ? 'no talkgroups — use ↓ SYNC RR to import' : visibleTGs.length === 0 ? 'no matches' : null}>
               {visibleTGs.map(t => (
                 <TGRow key={t.id} tg={t}
                   inScan={scanList.has(String(t.tgid))}
