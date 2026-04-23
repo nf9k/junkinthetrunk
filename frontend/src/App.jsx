@@ -238,11 +238,13 @@ const FONT_SIZE_LABELS = { small: 'S', normal: 'M', large: 'L', xlarge: 'XL' };
 function Nav({ page, setPage, connected, activeCount, emergencyCount,
               theme, toggleTheme, fontSize, cycleFontSize }) {
   return (
-    <nav className="nav">
+    <nav className="nav" style={{ position: 'relative' }}>
       <div className="nav__brand">
         <div className={`nav__dot${connected ? ' nav__dot--live' : ''}`} />
         <img src="/logo.png" alt="Junk in the Trunk" className="nav__logo" />
       </div>
+
+      <div className="nav__title">J.I.T.T.</div>
 
       <div className="nav__links">
         {PAGES.map(p => (
@@ -272,8 +274,7 @@ function Nav({ page, setPage, connected, activeCount, emergencyCount,
 }
 
 // ── System selector ───────────────────────────────────────────────────────────
-function SysBar({ systems, sysid, setSysid }) {
-  if (!systems.length) return null;
+function SysBar({ systems, sysid, setSysid, onAdd }) {
   return (
     <div className="sys-bar">
       <span className="mono dim" style={{ fontSize: '0.769rem', marginRight: 10 }}>SYSTEM</span>
@@ -285,6 +286,303 @@ function SysBar({ systems, sysid, setSysid }) {
           <span className="mono" style={{ marginLeft: 6, fontSize: '0.692rem', opacity: 0.5 }}>{s.sysid}</span>
         </button>
       ))}
+      <button className="sys-btn sys-btn--add" onClick={onAdd} title="Add system">+</button>
+    </div>
+  );
+}
+
+// ── Add System Modal ──────────────────────────────────────────────────────────
+
+function SystemRow({ sys, trackedSysids, onAdded }) {
+  const [status, setStatus] = useState(null); // null | 'adding' | {sysid} | {error}
+
+  const isP25 = sys.type === 8;
+  const isTracked = trackedSysids && sys.sysids?.length > 0 &&
+    sys.sysids.some(s => trackedSysids.has(s.sysid?.toUpperCase()));
+
+  const handleAdd = async () => {
+    setStatus('adding');
+    try {
+      const r = await fetch(`${API}/api/admin/systems`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rrSid: sys.sid }),
+      });
+      const data = await r.json();
+      if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+      setStatus({ sysid: data.sysid });
+      if (onAdded) onAdded(data.sysid);
+    } catch (err) {
+      setStatus({ error: err.message });
+    }
+  };
+
+  return (
+    <div className="sys-result-item">
+      <div className="sys-result-item__info">
+        <div className="sys-result-item__name">{sys.name || `System ${sys.sid}`}</div>
+        <div className="sys-result-item__meta">
+          {sys.city && <span>{sys.city}</span>}
+          {sys.dist != null && (
+            <span className="badge badge--dist">{sys.dist.toFixed(1)} mi</span>
+          )}
+          <span className={`badge ${isP25 ? 'badge--p25' : 'badge--non-p25'}`}>
+            {isP25 ? 'P25' : `type ${sys.type}`}
+          </span>
+          {sys.sysids?.length > 0 && (
+            <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              sysid {sys.sysids.map(s => s.sysid).join(', ')}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="sys-result-item__actions">
+        {isTracked || (status && status.sysid) ? (
+          <span className="badge badge--tracked">
+            {status?.sysid ? `✓ Added (${status.sysid})` : '● Tracked'}
+          </span>
+        ) : status === 'adding' ? (
+          <button className="btn btn-ghost" disabled style={{ opacity: 0.6 }}>Adding…</button>
+        ) : status?.error ? (
+          <span className="mono xs" style={{ color: 'var(--red)' }} title={status.error}>✗ Error</span>
+        ) : (
+          <button className="btn btn-primary" onClick={handleAdd}>Add</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddSystemModal({ onClose, onAdded, trackedSysids }) {
+  const [tab, setTab] = useState('nearby');
+
+  // Nearby tab state
+  const [nearbyStatus, setNearbyStatus] = useState('locating'); // locating | searching | done | error
+  const [nearbyLabel,  setNearbyLabel]  = useState('Locating…');
+  const [nearbyResults, setNearbyResults] = useState([]);
+  const [nearbyError,   setNearbyError]   = useState(null);
+
+  // State/County tab state
+  const [states,    setStates]    = useState([]);
+  const [counties,  setCounties]  = useState([]);
+  const [trsList,   setTrsList]   = useState([]);
+  const [selState,  setSelState]  = useState('');
+  const [selCounty, setSelCounty] = useState('');
+  const [scStatus,  setScStatus]  = useState(null);
+
+  // By ID tab state
+  const [byIdInput,   setByIdInput]   = useState('');
+  const [byIdResult,  setByIdResult]  = useState(null);
+  const [byIdStatus,  setByIdStatus]  = useState(null); // null | 'loading' | error string
+
+  // Run Nearby search on mount
+  useEffect(() => {
+    if (tab !== 'nearby') return;
+    if (nearbyStatus !== 'locating') return;
+
+    let cancelled = false;
+
+    async function run() {
+      try {
+        // IP geolocation
+        const ipRes = await fetch('https://ip-api.com/json');
+        const ipData = await ipRes.json();
+        if (cancelled) return;
+
+        const { lat, lon, city, region } = ipData;
+        // region is full state name; regionCode is the abbreviation
+        const stateCode = ipData.regionCode || ipData.region;
+        setNearbyLabel(`Searching near ${city}, ${region}…`);
+        setNearbyStatus('searching');
+
+        const nearRes = await fetch(
+          `${API}/api/admin/rr/nearby?lat=${lat}&lon=${lon}&stateCode=${stateCode}`
+        );
+        const data = await nearRes.json();
+        if (cancelled) return;
+
+        if (data.error) throw new Error(data.error);
+        setNearbyResults(data);
+        setNearbyStatus('done');
+        setNearbyLabel(`Systems within 25 mi of ${city}, ${region}`);
+      } catch (err) {
+        if (!cancelled) {
+          setNearbyError(err.message);
+          setNearbyStatus('error');
+        }
+      }
+    }
+
+    run();
+    return () => { cancelled = true; };
+  }, [tab]);
+
+  // Load states for State/County tab
+  useEffect(() => {
+    if (tab !== 'county' || states.length) return;
+    fetch(`${API}/api/admin/rr/states`)
+      .then(r => r.json())
+      .then(data => setStates(data))
+      .catch(err => console.error('[modal] states error:', err.message));
+  }, [tab]);
+
+  // Load counties when state selected
+  useEffect(() => {
+    if (!selState) { setCounties([]); setSelCounty(''); setTrsList([]); return; }
+    setScStatus('loading-counties');
+    setCounties([]); setSelCounty(''); setTrsList([]);
+    fetch(`${API}/api/admin/rr/counties/${selState}`)
+      .then(r => r.json())
+      .then(data => { setCounties(data); setScStatus(null); })
+      .catch(err => { setScStatus(`Error: ${err.message}`); });
+  }, [selState]);
+
+  // Load TRS systems when county selected
+  useEffect(() => {
+    if (!selCounty) { setTrsList([]); return; }
+    setScStatus('loading-systems');
+    setTrsList([]);
+    fetch(`${API}/api/admin/rr/county-trs/${selCounty}`)
+      .then(r => r.json())
+      .then(data => { setTrsList(data); setScStatus(null); })
+      .catch(err => { setScStatus(`Error: ${err.message}`); });
+  }, [selCounty]);
+
+  const lookUpById = async () => {
+    const sid = byIdInput.trim();
+    if (!sid || !Number.isFinite(parseInt(sid, 10))) return;
+    setByIdStatus('loading');
+    setByIdResult(null);
+    try {
+      const r = await fetch(`${API}/api/admin/rr/system/${sid}`);
+      const data = await r.json();
+      if (data.error) throw new Error(data.error);
+      setByIdResult(data);
+      setByIdStatus(null);
+    } catch (err) {
+      setByIdStatus(`Error: ${err.message}`);
+    }
+  };
+
+  const handleAdded = (sysid) => {
+    // Notify parent to refresh systems list
+    if (onAdded) onAdded(sysid);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal">
+        <div className="modal__header">
+          <span className="modal__title">ADD SYSTEM</span>
+          <button className="modal__close" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal__tabs">
+          {[['nearby', 'Nearby'], ['county', 'State / County'], ['byid', 'By ID']].map(([key, label]) => (
+            <button key={key}
+              className={`modal__tab${tab === key ? ' modal__tab--active' : ''}`}
+              onClick={() => setTab(key)}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="modal__body">
+          {/* Nearby tab */}
+          {tab === 'nearby' && (
+            <>
+              {nearbyStatus !== 'done' && !nearbyError && (
+                <div className="modal__status">{nearbyLabel}</div>
+              )}
+              {nearbyError && (
+                <div className="modal__status" style={{ color: 'var(--red)' }}>
+                  Location error: {nearbyError}
+                </div>
+              )}
+              {nearbyStatus === 'done' && nearbyResults.length === 0 && (
+                <div className="modal__status">No P25 systems found within 25 miles.</div>
+              )}
+              {nearbyStatus === 'done' && nearbyResults.length > 0 && (
+                <>
+                  <div className="modal__status">{nearbyLabel}</div>
+                  <div className="sys-result-list">
+                    {nearbyResults.map(s => (
+                      <SystemRow key={s.sid} sys={s}
+                        trackedSysids={trackedSysids} onAdded={handleAdded} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* State/County tab */}
+          {tab === 'county' && (
+            <>
+              <div className="modal__controls">
+                <select className="input-field" value={selState}
+                  onChange={e => setSelState(e.target.value)}
+                  style={{ minWidth: 180 }}>
+                  <option value="">— Select state —</option>
+                  {states.map(s => (
+                    <option key={s.stid} value={s.stid}>{s.name}</option>
+                  ))}
+                </select>
+                {counties.length > 0 && (
+                  <select className="input-field" value={selCounty}
+                    onChange={e => setSelCounty(e.target.value)}
+                    style={{ minWidth: 180 }}>
+                    <option value="">— Select county —</option>
+                    {counties.map(c => (
+                      <option key={c.ctid} value={c.ctid}>{c.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              {scStatus && (
+                <div className="modal__status">{scStatus}</div>
+              )}
+              {trsList.length > 0 && (
+                <div className="sys-result-list">
+                  {trsList.map(s => (
+                    <SystemRow key={s.sid} sys={s}
+                      trackedSysids={trackedSysids} onAdded={handleAdded} />
+                  ))}
+                </div>
+              )}
+              {selCounty && !scStatus && trsList.length === 0 && (
+                <div className="modal__status">No trunked systems found in this county.</div>
+              )}
+            </>
+          )}
+
+          {/* By ID tab */}
+          {tab === 'byid' && (
+            <>
+              <div className="modal__id-input">
+                <input className="input-field" placeholder="RadioReference system ID (numeric)"
+                  value={byIdInput}
+                  onChange={e => setByIdInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && lookUpById()}
+                  type="number" min="1" />
+                <button className="btn btn-primary"
+                  onClick={lookUpById}
+                  disabled={byIdStatus === 'loading'}>
+                  {byIdStatus === 'loading' ? 'Looking up…' : 'Look Up'}
+                </button>
+              </div>
+              {byIdStatus && byIdStatus !== 'loading' && (
+                <div className="modal__status" style={{ color: 'var(--red)' }}>{byIdStatus}</div>
+              )}
+              {byIdResult && (
+                <div className="sys-result-list">
+                  <SystemRow sys={byIdResult}
+                    trackedSysids={trackedSysids} onAdded={handleAdded} />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -496,6 +794,7 @@ function SiteInfoPage({ detail }) {
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
+  const [splash,     setSplash]     = useState(() => !sessionStorage.getItem('jitt-splash'));
   const [page,       setPage]       = useState('Dashboard');
   const [connected,  setConnected]  = useState(false);
   const [systems,    setSystems]    = useState([]);
@@ -522,6 +821,7 @@ export default function App() {
   const [tgGroupFilter, setTgGroupFilter] = useState('');
   const [tgActiveOnly,  setTgActiveOnly]  = useState(true);
   const [rrSync,        setRrSync]        = useState(null); // null | 'syncing' | {total} | {error}
+  const [showAddModal,  setShowAddModal]  = useState(false);
   const sysidRef    = useRef(sysid);
   const lockedTgRef = useRef(null);
   useEffect(() => { sysidRef.current = sysid; }, [sysid]);
@@ -531,6 +831,16 @@ export default function App() {
     localStorage.setItem('jitt-theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(t => t === 'day' ? 'night' : 'day');
+
+  // Splash: CSS animation runs 2.4s, then unmount the overlay
+  useEffect(() => {
+    if (!splash) return;
+    const t = setTimeout(() => {
+      setSplash(false);
+      sessionStorage.setItem('jitt-splash', '1');
+    }, 2400);
+    return () => clearTimeout(t);
+  }, [splash]);
 
   useEffect(() => {
     localStorage.setItem('jitt-scan-list', JSON.stringify([...scanList]));
@@ -869,14 +1179,27 @@ export default function App() {
 
   return (
     <div className="app">
+      {splash && (
+        <div className="splash">
+          <img src="/logo.png" className="splash__logo" alt="J.I.T.T." />
+        </div>
+      )}
       <Nav page={page} setPage={setPage} connected={connected}
         activeCount={active.length} emergencyCount={emergency.length}
         theme={theme} toggleTheme={toggleTheme}
         fontSize={fontSize} cycleFontSize={cycleFontSize} />
-      <SysBar systems={systems} sysid={sysid} setSysid={setSysid} />
+      <SysBar systems={systems} sysid={sysid} setSysid={setSysid}
+        onAdd={() => setShowAddModal(true)} />
       {lockedTg && (
         <TgLockBar lockedTg={lockedTg} queueLen={audioQueue.length}
           isPlaying={!!playingLockId} onStop={unlockTg} />
+      )}
+      {showAddModal && (
+        <AddSystemModal
+          onClose={() => setShowAddModal(false)}
+          onAdded={() => { fetchSystems(); setShowAddModal(false); }}
+          trackedSysids={new Set(systems.map(s => s.sysid))}
+        />
       )}
       {renderPage()}
       {lockedTg && (
