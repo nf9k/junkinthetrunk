@@ -32,6 +32,7 @@ app.use('/api/systems',    require('./routes/systems'));
 app.use('/api/calls',      require('./routes/calls'));
 app.use('/api/talkgroups', require('./routes/talkgroups'));
 app.use('/api/units',      require('./routes/units'));
+app.use('/api/admin',      require('./routes/admin'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });

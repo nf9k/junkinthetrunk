@@ -74,9 +74,13 @@ services:
       - PORT=3000
       - TZ=${TZ:-America/Indiana/Indianapolis}
       - NODE_ENV=production
+      - RR_USERNAME=${RR_USERNAME:-wdatkinson}
+      - RR_PASSWORD=${RR_PASSWORD:-}
+      - RR_API_KEY=${RR_API_KEY:-}
+      - RR_SYSTEMS=${RR_SYSTEMS:-}
     volumes:
       - audio-data:/audio:ro
-      - ./config/talkgroups:/talkgroups:ro
+      - ./config/talkgroups:/talkgroups
       - ./config/${TR_CONFIG:-trunk-recorder.json}:/app/tr-config.json:ro
     ports:
       - "127.0.0.1:3001:3000"
