@@ -10,7 +10,7 @@
       "squelch": -160,
       "driver":  "osmosdr",
       "device":  "rtl=TRUNK0",
-      "digitalRecorders": 10,
+      "digitalRecorders": 5,
       "antenna": "TRUNK0 — CC 856.8125 MHz + voice 856.1–858.5 MHz"
     },
     {
@@ -21,7 +21,7 @@
       "squelch": -60,
       "driver":  "osmosdr",
       "device":  "rtl=TRUNK1",
-      "digitalRecorders": 10,
+      "digitalRecorders": 5,
       "antenna": "TRUNK1 — voice 851.36–854.24 MHz"
     },
     {
@@ -32,7 +32,7 @@
       "squelch": -60,
       "driver":  "osmosdr",
       "device":  "rtl=TRUNK2",
-      "digitalRecorders": 6,
+      "digitalRecorders": 4,
       "antenna": "TRUNK2 — sys3 alt CCs 858.8125 / 859.8125 MHz + voice 858.1–860.5 MHz"
     }
   ],

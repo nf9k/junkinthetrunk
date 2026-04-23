@@ -18,6 +18,10 @@ services:
       - audio-data:/app/audio
     environment:
       - TZ=${TZ:-America/Indiana/Indianapolis}
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
     depends_on:
       - mosquitto
     restart: unless-stopped

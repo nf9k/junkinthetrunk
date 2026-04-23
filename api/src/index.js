@@ -104,14 +104,22 @@ setInterval(cleanStaleActive, 60_000);
 // Scan the audio volume, parse filenames ({tgid}-{ts}_{freq}-call_{n}.m4a),
 // and link each file to the matching call row.
 
+const SYNC_MAX_AGE_MS = 120_000; // only consider files written in last 2 minutes
+
 function walkM4a(dir, base) {
   const out = [];
+  const cutoff = Date.now() - SYNC_MAX_AGE_MS;
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
     const full = path.join(dir, e.name);
-    if (e.isDirectory()) out.push(...walkM4a(full, base));
-    else if (e.name.endsWith('.m4a')) out.push({ full, rel: path.relative(base, full), name: e.name });
+    if (e.isDirectory()) {
+      // Skip entire date directories that are too old
+      try { if (fs.statSync(full).mtimeMs < cutoff) continue; } catch { continue; }
+      out.push(...walkM4a(full, base));
+    } else if (e.name.endsWith('.m4a')) {
+      try { if (fs.statSync(full).mtimeMs >= cutoff) out.push({ full, rel: path.relative(base, full), name: e.name }); } catch {}
+    }
   }
   return out;
 }
