@@ -119,18 +119,18 @@ The `<sys-bar>` under the nav switches between all P25 systems the API has seen 
 
 ## MQTT Topic Structure
 
-The decoder's MQTT plugin (`libmqtt_status_plugin.so`) publishes under the `jitr` prefix (set via `MQTT_TOPIC_PREFIX` in `compose.yml` / `trunk-recorder.json`):
+The decoder's MQTT plugin (`libmqtt_status_plugin.so`) publishes under the `jitt` prefix (set via `MQTT_TOPIC_PREFIX` in `compose.yml` / `trunk-recorder.json`):
 
 | Topic | Direction | Notes |
 |---|---|---|
-| `jitr/call_start`   | decoder → api | New voice grant |
-| `jitr/call_end`     | decoder → api | Call finalized — only fires when the audio recording ran to completion |
-| `jitr/calls_active` | decoder → api | Snapshot of all active calls; published once a second. API also uses this to *synthesize* `call_end` for calls whose voice freq was out of the SDR window (so the Call Log populates even without audio capture). |
-| `jitr/rates`        | decoder → api | Decode rate per control channel, every ~3 s. Persists into `system_stats.current_control_freq` / `current_decode_rate`. |
-| `jitr/systems`      | decoder → api | Retained. Fills WACN / NAC / RFSS / current site on the systems row once the decoder hears a network status TSBK. |
-| `jitr/config`       | decoder → api | Retained. Source SDR windows + squelch. |
-| `jitr/recorders`    | decoder → api | Every-3 s snapshot of recorder states. |
-| `jitr/units/<shortname>/<event>` | decoder → api | Unit activity — `call`, `on`, `off`, `join`. |
+| `jitt/call_start`   | decoder → api | New voice grant |
+| `jitt/call_end`     | decoder → api | Call finalized — only fires when the audio recording ran to completion |
+| `jitt/calls_active` | decoder → api | Snapshot of all active calls; published once a second. API also uses this to *synthesize* `call_end` for calls whose voice freq was out of the SDR window (so the Call Log populates even without audio capture). |
+| `jitt/rates`        | decoder → api | Decode rate per control channel, every ~3 s. Persists into `system_stats.current_control_freq` / `current_decode_rate`. |
+| `jitt/systems`      | decoder → api | Retained. Fills WACN / NAC / RFSS / current site on the systems row once the decoder hears a network status TSBK. |
+| `jitt/config`       | decoder → api | Retained. Source SDR windows + squelch. |
+| `jitt/recorders`    | decoder → api | Every-3 s snapshot of recorder states. |
+| `jitt/units/<shortname>/<event>` | decoder → api | Unit activity — `call`, `on`, `off`, `join`. |
 
 The trunk-recorder `shortName` **must equal the hex sysid** (e.g. `"262"` for MESA) — the plugin doesn't carry a sysid field in per-call messages, so we derive our DB key from `sys_name`.
 

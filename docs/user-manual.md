@@ -131,9 +131,9 @@ The first `docker compose up` triggers a multi-stage build of the trunk-recorder
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `DB_PASSWORD` | yes | Postgres password for the `jitr` user. |
+| `DB_PASSWORD` | yes | Postgres password for the `jitt` user. |
 | `TZ` | no | Timezone for container logs / timestamps. Default `America/Indiana/Indianapolis`. |
-| `MQTT_TOPIC_PREFIX` | no | Base topic for the decoder plugin. Must match the `topic` field in `trunk-recorder.json`. Default `jitr`. |
+| `MQTT_TOPIC_PREFIX` | no | Base topic for the decoder plugin. Must match the `topic` field in `trunk-recorder.json`. Default `jitt`. |
 | `VITE_API_URL` | no | Leave blank for the normal single-host setup — nginx proxies `/api` and `/socket.io`. Only set if the UI is served from a host that can't reach the api via the same origin. |
 
 \newpage
@@ -280,21 +280,21 @@ Four panels, top to bottom:
 
 ## MQTT topics
 
-The decoder's `libmqtt_status_plugin.so` publishes under the `jitr` prefix (override via `MQTT_TOPIC_PREFIX`):
+The decoder's `libmqtt_status_plugin.so` publishes under the `jitt` prefix (override via `MQTT_TOPIC_PREFIX`):
 
 | Topic | Cadence | What it carries |
 |---|---|---|
-| `jitr/trunk_recorder/status` | on connect (retained) | `{status: "connected"}` heartbeat |
-| `jitr/config` | on startup (retained) | Full trunk-recorder config: sources, systems, squelch |
-| `jitr/systems` | on startup + as data arrives (retained) | Per-system metadata: sysid, WACN, NAC, RFSS, site_id |
-| `jitr/rates` | ~every 3 s | Decode rate per control channel |
-| `jitr/call_start` | per voice grant | Full call data, nested under a `call` object |
-| `jitr/call_end` | per recording finalized | Fires only if audio was captured; includes filename + duration |
-| `jitr/calls_active` | every 1 s | Snapshot of all currently-active calls (the `call_num` inside is the disambiguator) |
-| `jitr/recorders` | every 3 s | Every recorder's state: RECORDING / IDLE / AVAILABLE, current TGID and freq |
-| `jitr/units/<shortname>/<event>` | per event | Unit activity: `call`, `on`, `off`, `join` |
+| `jitt/trunk_recorder/status` | on connect (retained) | `{status: "connected"}` heartbeat |
+| `jitt/config` | on startup (retained) | Full trunk-recorder config: sources, systems, squelch |
+| `jitt/systems` | on startup + as data arrives (retained) | Per-system metadata: sysid, WACN, NAC, RFSS, site_id |
+| `jitt/rates` | ~every 3 s | Decode rate per control channel |
+| `jitt/call_start` | per voice grant | Full call data, nested under a `call` object |
+| `jitt/call_end` | per recording finalized | Fires only if audio was captured; includes filename + duration |
+| `jitt/calls_active` | every 1 s | Snapshot of all currently-active calls (the `call_num` inside is the disambiguator) |
+| `jitt/recorders` | every 3 s | Every recorder's state: RECORDING / IDLE / AVAILABLE, current TGID and freq |
+| `jitt/units/<shortname>/<event>` | per event | Unit activity: `call`, `on`, `off`, `join` |
 
-The API subscribes to `jitr/#` and routes by subtopic.
+The API subscribes to `jitt/#` and routes by subtopic.
 
 ## WebSocket events (server → browser)
 
@@ -324,9 +324,9 @@ The API subscribes to `jitr/#` and routes by subtopic.
 
 # Troubleshooting
 
-**Dashboard is blank** — the frontend JS bundle is probably hitting the wrong backend. Check `localStorage.getItem('jitr-theme')` in the browser console and inspect the Network tab. If requests are going to `http://localhost:3000`, your build baked in the old `VITE_API_URL`. Leave `VITE_API_URL=` blank in `.env` and rebuild frontend.
+**Dashboard is blank** — the frontend JS bundle is probably hitting the wrong backend. Check `localStorage.getItem('jitt-theme')` in the browser console and inspect the Network tab. If requests are going to `http://localhost:3000`, your build baked in the old `VITE_API_URL`. Leave `VITE_API_URL=` blank in `.env` and rebuild frontend.
 
-**`docker compose up -d trunk-recorder` keeps restarting** — check `docker logs jitr-decoder 2>&1 | tail -30`. Most common causes:
+**`docker compose up -d trunk-recorder` keeps restarting** — check `docker logs jitt-decoder 2>&1 | tail -30`. Most common causes:
 
 - `Failed parsing Config: (/sysId) type must be number, but is string` — trunk-recorder v5 requires `"sysId"` as a decimal integer. `0x262 = 610`.
 - `(/control_channels) type must be array, but is null` — the field is named `control_channels` (underscore) in v5, not `control_channel_list`.
@@ -337,7 +337,7 @@ The API subscribes to `jitr/#` and routes by subtopic.
 
 **Bad Gateway (502) from the UI** — nginx cached the api container's previous IP after an api restart. `docker compose restart frontend` fixes it.
 
-**No `call_end` events, Call Log empty** — trunk-recorder only emits `call_end` when an audio recording completes. For single-dongle out-of-band voice setups, the API's `calls_active` synthesizer fills in the Call Log without audio; make sure the `unit_topic` and `calls_active` handlers are firing (`docker logs jitr-api 2>&1 | grep call:end`).
+**No `call_end` events, Call Log empty** — trunk-recorder only emits `call_end` when an audio recording completes. For single-dongle out-of-band voice setups, the API's `calls_active` synthesizer fills in the Call Log without audio; make sure the `unit_topic` and `calls_active` handlers are firing (`docker logs jitt-api 2>&1 | grep call:end`).
 
 **`WACN: 0`, `RFSS: 0` on the Site Info panel** — the decoder plugin publishes a placeholder zeroed `systems` message on startup, before it's heard a network status TSBK. Real values arrive on the next `systems` publish (can take a minute after the first control-channel message). The API's COALESCE logic preserves real values across later empty/zero messages; if you ever see a stale `0` stored in the DB, clear it with `UPDATE systems SET wacn=NULL WHERE wacn='0';` and wait for the next retained publish.
 
@@ -381,13 +381,13 @@ The talkgroup / sites CSVs are re-imported on API startup so the big tables repo
 ## Backing up the DB
 
 ```bash
-docker exec jitr-db pg_dump -U jitr jitr > jitr-$(date -u +%Y%m%d-%H%M).sql
+docker exec jitt-db pg_dump -U jitt jitt > jitt-$(date -u +%Y%m%d-%H%M).sql
 ```
 
 Restore:
 
 ```bash
-docker exec -i jitr-db psql -U jitr -d jitr < jitr-YYYYMMDD-HHMM.sql
+docker exec -i jitt-db psql -U jitt -d jitt < jitt-YYYYMMDD-HHMM.sql
 ```
 
 ## Refreshing RadioReference data

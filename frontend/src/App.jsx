@@ -512,10 +512,10 @@ export default function App() {
   const [playingLockId, setPlayingLockId] = useState(null);
   const lockAudioRef    = useRef(null);
   const audioUnlocked   = useRef(false);
-  const [theme, setTheme] = useState(() => localStorage.getItem('jitr-theme') || 'night');
-  const [fontSize, setFontSize] = useState(() => localStorage.getItem('jitr-font-size') || 'normal');
+  const [theme, setTheme] = useState(() => localStorage.getItem('jitt-theme') || 'night');
+  const [fontSize, setFontSize] = useState(() => localStorage.getItem('jitt-font-size') || 'normal');
   const [scanList, setScanList] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('jitr-scan-list') || '[]')); }
+    try { return new Set(JSON.parse(localStorage.getItem('jitt-scan-list') || '[]')); }
     catch { return new Set(); }
   });
   const [tgSearch,      setTgSearch]      = useState('');
@@ -528,12 +528,12 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem('jitr-theme', theme);
+    localStorage.setItem('jitt-theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(t => t === 'day' ? 'night' : 'day');
 
   useEffect(() => {
-    localStorage.setItem('jitr-scan-list', JSON.stringify([...scanList]));
+    localStorage.setItem('jitt-scan-list', JSON.stringify([...scanList]));
   }, [scanList]);
   const toggleScan = useCallback((tgid) => {
     setScanList(prev => { const n = new Set(prev); n.has(tgid) ? n.delete(tgid) : n.add(tgid); return n; });
@@ -565,7 +565,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.fontSize = fontSize;
-    localStorage.setItem('jitr-font-size', fontSize);
+    localStorage.setItem('jitt-font-size', fontSize);
   }, [fontSize]);
   const FONT_SIZE_CYCLE = ['small', 'normal', 'large', 'xlarge'];
   const cycleFontSize = () => setFontSize(f => {

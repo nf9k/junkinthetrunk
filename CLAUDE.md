@@ -5,8 +5,8 @@ Docker/Podman stack for APCO P25 trunked radio monitoring via RTL-SDR.
 Personal homelab project, not on code.roche.com.
 
 ## Stack
-- trunk-recorder (built locally from `./decoder/Dockerfile`, image tag `jitr-trunk-recorder:local`) — P25 decode + voice follow, with the `tr-plugin-mqtt` status plugin compiled in AND `patches/arc4-decrypt.patch` applied (enables ARC4/ADP decryption, which upstream disables). `decoder/entrypoint.sh` merges `config/keys.json` into the runtime config via `jq`. The stock `ghcr.io/robotastic/trunk-recorder` image does NOT ship the MQTT plugin; it's from `github.com/TrunkRecorder/tr-plugin-mqtt` (produces `libmqtt_status_plugin.so`).
-- mosquitto:2 — internal MQTT broker, topic prefix: `jitr`
+- trunk-recorder (built locally from `./decoder/Dockerfile`, image tag `jitt-trunk-recorder:local`) — P25 decode + voice follow, with the `tr-plugin-mqtt` status plugin compiled in AND `patches/arc4-decrypt.patch` applied (enables ARC4/ADP decryption, which upstream disables). `decoder/entrypoint.sh` merges `config/keys.json` into the runtime config via `jq`. The stock `ghcr.io/robotastic/trunk-recorder` image does NOT ship the MQTT plugin; it's from `github.com/TrunkRecorder/tr-plugin-mqtt` (produces `libmqtt_status_plugin.so`).
+- mosquitto:2 — internal MQTT broker, topic prefix: `jitt`
 - postgres:16-alpine — sysid-keyed schema, `upsert_system()` PG function
 - Node.js API (Express + Socket.IO) — MQTT subscriber, REST, WebSocket
 - React + Vite + Nginx frontend — amber/dark tactical ops aesthetic
@@ -14,13 +14,13 @@ Personal homelab project, not on code.roche.com.
 ## Key conventions
 - compose.yml (not docker-compose.yml, not compose.yaml)
 - No npm workspaces — api/ and frontend/ are independent packages
-- MQTT prefix is `jitr` — must match MQTT_TOPIC_PREFIX in compose.yml and trunk-recorder.json
+- MQTT prefix is `jitt` — must match MQTT_TOPIC_PREFIX in compose.yml and trunk-recorder.json
 - sysid is always uppercase hex (e.g. "262" for MESA, "6BD" for SAFE-T), normalized in mqtt.js
 - trunk-recorder `shortName` in config must equal the hex sysid — the plugin emits `sys_name` (not sysid); we uppercase `sys_name` → DB key
 - trunk-recorder `sysId` in config is decimal (v5+), not the hex string: `0x262 = 610`, `0x6BD = 1725`
-- MQTT topics from tr-plugin-mqtt: `jitr/call_start`, `jitr/call_end`, `jitr/rates` (underscored, not slash-subpathed)
+- MQTT topics from tr-plugin-mqtt: `jitt/call_start`, `jitt/call_end`, `jitt/rates` (underscored, not slash-subpathed)
 - WebSocket events: `active:snapshot`, `call:start`, `call:end`, `rates`
-- DB: PostgreSQL user/db both named `jitr`
+- DB: PostgreSQL user/db both named `jitt`
 - Talkgroup CSVs: `<sysid>.csv`; site CSVs: `<sysid>.sites.csv` — both auto-imported on API start
 - `sites` table is UNIQUE(sysid, rfss_id, site_id) — RFSS matters (SAFE-T has 2 RFSSes sharing site ids)
 
@@ -46,7 +46,7 @@ Personal homelab project, not on code.roche.com.
 - decoder/Dockerfile — debian:trixie multi-stage build of trunk-recorder + tr-plugin-mqtt
 
 ## Versioning
-- Images: `jitr-trunk-recorder`, `jitr-api`, `jitr-frontend` — tagged `:local` for dev, `:<version>` + `:latest` for release
+- Images: `jitt-trunk-recorder`, `jitt-api`, `jitt-frontend` — tagged `:local` for dev, `:<version>` + `:latest` for release
 - `make release` builds all three and tags them; version is set in Makefile (v1.00, increment by .01 per release)
 
 ## What's not done yet

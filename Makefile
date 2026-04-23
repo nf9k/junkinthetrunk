@@ -1,7 +1,7 @@
 VERSION  := v1.00
-DECODER  := jitr-trunk-recorder
-API      := jitr-api
-FRONTEND := jitr-frontend
+DECODER  := jitt-trunk-recorder
+API      := jitt-api
+FRONTEND := jitt-frontend
 
 .PHONY: build tag release
 

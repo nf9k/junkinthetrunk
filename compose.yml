@@ -6,8 +6,8 @@ services:
     build:
       context: .
       dockerfile: decoder/Dockerfile
-    image: jitr-trunk-recorder:local
-    container_name: jitr-decoder
+    image: jitt-trunk-recorder:local
+    container_name: jitt-decoder
     privileged: true
     devices:
       - /dev/bus/usb
@@ -33,7 +33,7 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: jitr-mqtt
+    container_name: jitt-mqtt
     volumes:
       - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mqtt-data:/mosquitto/data
@@ -44,10 +44,10 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: jitr-db
+    container_name: jitt-db
     environment:
-      POSTGRES_DB: jitr
-      POSTGRES_USER: jitr
+      POSTGRES_DB: jitt
+      POSTGRES_USER: jitt
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - pg-data:/var/lib/postgresql/data
@@ -55,7 +55,7 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U jitr"]
+      test: ["CMD-SHELL", "pg_isready -U jitt"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,12 +68,12 @@ services:
       args:
         # App-level RR key — baked into the image, not end-user configurable
         RR_APP_KEY: ${RR_APP_KEY:-}
-    image: jitr-api:local
-    container_name: jitr-api
+    image: jitt-api:local
+    container_name: jitt-api
     environment:
-      - DATABASE_URL=postgresql://jitr:${DB_PASSWORD}@postgres/jitr
+      - DATABASE_URL=postgresql://jitt:${DB_PASSWORD}@postgres/jitt
       - MQTT_URL=mqtt://mosquitto:1883
-      - MQTT_TOPIC_PREFIX=${MQTT_TOPIC_PREFIX:-jitr}
+      - MQTT_TOPIC_PREFIX=${MQTT_TOPIC_PREFIX:-jitt}
       - PORT=3000
       - TZ=${TZ:-America/Indiana/Indianapolis}
       - NODE_ENV=production
@@ -108,8 +108,8 @@ services:
         # only if you're serving the UI from a host that can't reach the
         # api via relative URLs (rare).
         - VITE_API_URL=${VITE_API_URL:-}
-    image: jitr-frontend:local
-    container_name: jitr-ui
+    image: jitt-frontend:local
+    container_name: jitt-ui
     ports:
       - "8080:80"
     depends_on:

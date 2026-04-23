@@ -60,9 +60,9 @@
       "name":       "MQTT Status",
       "library":    "libmqtt_status_plugin.so",
       "broker":     "tcp://mosquitto:1883",
-      "topic":      "jitr",
-      "unit_topic": "jitr/units",
-      "client_id":  "jitr-decoder",
+      "topic":      "jitt",
+      "unit_topic": "jitt/units",
+      "client_id":  "jitt-decoder",
       "mqtt_audio": false,
       "qos":        0
     }

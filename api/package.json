@@ -1,5 +1,5 @@
 {
-  "name": "jitr-api",
+  "name": "jitt-api",
   "version": "1.0.0",
   "description": "Junk in the Trunk — P25 trunk monitor API",
   "main": "src/index.js",

@@ -3,7 +3,7 @@
 const mqtt   = require('mqtt');
 const { query } = require('./db');
 
-const PREFIX = process.env.MQTT_TOPIC_PREFIX || 'jitr';
+const PREFIX = process.env.MQTT_TOPIC_PREFIX || 'jitt';
 let   io     = null;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ function connect(socketIo) {
   io = socketIo;
 
   const client = mqtt.connect(process.env.MQTT_URL || 'mqtt://mosquitto:1883', {
-    clientId: 'jitr-api',
+    clientId: 'jitt-api',
     clean:    true,
     reconnectPeriod: 3000,
   });

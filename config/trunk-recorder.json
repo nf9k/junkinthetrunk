@@ -61,9 +61,9 @@
       "name":       "MQTT Status",
       "library":    "libmqtt_status_plugin.so",
       "broker":     "tcp://mosquitto:1883",
-      "topic":      "jitr",
-      "unit_topic": "jitr/units",
-      "client_id":  "jitr-decoder",
+      "topic":      "jitt",
+      "unit_topic": "jitt/units",
+      "client_id":  "jitt-decoder",
       "mqtt_audio": false,
       "qos":        0
     }
@@ -86,7 +86,7 @@
     "To switch to Indiana SAFE-T (sysid 6BD / decimal 1725), update shortName,",
     "  sysId, talkgroupsFile, and control_channels from config/talkgroups/6BD.sites.csv.",
     "device: rtl=TRUNK0 — set once per dongle: rtl_eeprom -d 0 -s TRUNK0",
-    "MQTT plugin: libmqtt_status_plugin.so is built into the jitr-trunk-recorder:local",
+    "MQTT plugin: libmqtt_status_plugin.so is built into the jitt-trunk-recorder:local",
     "  image (see decoder/Dockerfile). The stock ghcr.io image does NOT include it."
   ]
 }
