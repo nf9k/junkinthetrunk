@@ -18,7 +18,7 @@ function authInfo() {
   return {
     username: process.env.RR_USERNAME || '',
     password: process.env.RR_PASSWORD || '',
-    appKey:   process.env.RR_API_KEY  || '',
+    appKey:   process.env.RR_APP_KEY  || '',
     version:  '15',
     style:    'rpc',
   };
