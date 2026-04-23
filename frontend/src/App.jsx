@@ -540,21 +540,6 @@ export default function App() {
   }, []);
   const clearScan = useCallback(() => setScanList(new Set()), []);
 
-  const syncRR = useCallback(async () => {
-    setRrSync('syncing');
-    try {
-      const r = await fetch(`${API}/api/admin/sync-rr`, { method: 'POST' });
-      const data = await r.json();
-      if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
-      setRrSync({ total: data.total });
-      if (sysidRef.current) fetchTalkgroups(sysidRef.current);
-      setTimeout(() => setRrSync(null), 5000);
-    } catch (err) {
-      setRrSync({ error: err.message });
-      setTimeout(() => setRrSync(null), 8000);
-    }
-  }, [fetchTalkgroups]);
-
   const lockTg = useCallback((call) => {
     // Unlock browser audio on this user gesture so later .play() calls work
     if (!audioUnlocked.current) {
@@ -659,6 +644,21 @@ export default function App() {
   const fetchSysDetail = useCallback(async (sid) => {
     try { setSysDetail(await api(`/api/systems/${sid}`)); } catch { }
   }, []);
+
+  const syncRR = useCallback(async () => {
+    setRrSync('syncing');
+    try {
+      const r = await fetch(`${API}/api/admin/sync-rr`, { method: 'POST' });
+      const data = await r.json();
+      if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      setRrSync({ total: data.total });
+      if (sysidRef.current) fetchTalkgroups(sysidRef.current);
+      setTimeout(() => setRrSync(null), 5000);
+    } catch (err) {
+      setRrSync({ error: err.message });
+      setTimeout(() => setRrSync(null), 8000);
+    }
+  }, [fetchTalkgroups]);
 
   // Initial load + polling
   useEffect(() => {
