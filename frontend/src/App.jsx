@@ -223,7 +223,7 @@ function Nav({ page, setPage, connected, activeCount, emergencyCount,
     <nav className="nav">
       <div className="nav__brand">
         <div className={`nav__dot${connected ? ' nav__dot--live' : ''}`} />
-        <span className="nav__title">JUNK IN THE TRUNK</span>
+        <img src="/logo.png" alt="Junk in the Trunk" className="nav__logo" />
       </div>
 
       <div className="nav__links">

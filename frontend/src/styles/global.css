@@ -666,12 +666,9 @@ select.input-field option { background: var(--bg-surface); color: var(--text-pri
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
-.nav__title {
-  font-family: var(--font-display);
-  font-size: 1.538rem;
-  letter-spacing: 4px;
-  color: var(--cyan);
-  text-shadow: none;
+.nav__logo {
+  height: 38px;
+  width: auto;
 }
 
 .nav__links { display: flex; flex: 1; gap: 2px; }
