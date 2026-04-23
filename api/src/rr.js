@@ -110,7 +110,7 @@ async function syncSystem(rrSid, sysid) {
     const tagDescr  = tagItems.length ? (tagMap[val(tagItems[0].tagId)] || '') : '';
 
     csvLines.push(
-      `${tgid},${hex},${csvEsc(alpha)},${mode},${csvEsc(desc)},${csvEsc(tagDescr)},`
+      `${tgid},${hex},${csvEsc(alpha)},${mode},${csvEsc(desc)},${csvEsc(tagDescr)},${csvEsc('')}`
     );
 
     await query(`
