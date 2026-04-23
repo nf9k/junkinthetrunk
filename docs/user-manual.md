@@ -45,7 +45,7 @@ A P25 trunked system is a network of radios that shares a small pool of RF chann
 
 ## What this is *not*
 
-- Not a broadcast-audio streamer. There's a built-in audio player for recorded calls, but no live-listen path (by design — simpler, lower load).
+- Not a true live-listen scanner. Recorded calls play back with a short lag (typically under 10 seconds) while the audio file is written and linked. The **TG lock** feature on the Dashboard lets you click any active call card to follow that talkgroup and auto-play each completed transmission — close to real-time for most calls, but not zero-latency streaming.
 - Not an OpenMHz / Broadcastify uploader. Those plugins are bundled in the decoder image but disabled by default; configure `trunk-recorder.json` manually if you want them.
 - Supports decryption of encrypted talkgroups when the operator is authorized and configures keys in `config/keys.json`. Calls whose encryption is not configured record metadata only.
 
