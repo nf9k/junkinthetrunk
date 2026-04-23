@@ -120,13 +120,14 @@ async function syncAudioFiles() {
   try {
     const files = walkM4a(AUDIO_ROOT, AUDIO_ROOT);
     let linked = 0;
+    const newAudio = [];
     for (const { rel, name } of files) {
       const m = name.match(/^(\d+)-(\d+(?:\.\d+)?)_(\d+(?:\.\d+)?)-call_\d+\.m4a$/);
       if (!m) continue;
       const tgid   = parseInt(m[1], 10);
       const unixTs = parseFloat(m[2]);
       const freq   = Math.round(parseFloat(m[3]));
-      const { rowCount } = await query(`
+      const { rows, rowCount } = await query(`
         UPDATE calls SET audio_file = $1
         WHERE id = (
           SELECT id FROM calls
@@ -135,10 +136,15 @@ async function syncAudioFiles() {
           ORDER BY ABS(EXTRACT(EPOCH FROM start_time) - $4)
           LIMIT 1
         )
+        RETURNING id, sysid, tgid
       `, [rel, tgid, freq, unixTs]);
-      linked += rowCount;
+      if (rowCount > 0) { linked++; newAudio.push(rows[0]); }
     }
-    if (linked > 0) io.emit('calls:updated');
+    if (linked > 0) {
+      io.emit('calls:updated');
+      for (const { id, sysid, tgid } of newAudio)
+        io.emit('call:audio', { call_id: id, sysid, tgid });
+    }
   } catch (err) {
     console.error('[audioSync] error:', err.message);
   }

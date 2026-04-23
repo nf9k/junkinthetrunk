@@ -56,7 +56,11 @@ router.get('/:id/audio', async (req, res) => {
   if (!rows.length || !rows[0].audio_file) {
     return res.status(404).json({ error: 'No audio for this call' });
   }
-  const filePath = path.join(AUDIO_ROOT, rows[0].audio_file);
+  let af = rows[0].audio_file;
+  // Normalize: strip absolute prefix written by some trunk-recorder builds
+  if (af.startsWith('/app/audio/')) af = af.slice('/app/audio/'.length);
+  else if (af.startsWith('/'))      af = af.slice(1);
+  const filePath = path.join(AUDIO_ROOT, af);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ error: 'Audio file not found on disk' });
   }

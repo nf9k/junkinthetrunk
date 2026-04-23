@@ -67,13 +67,15 @@ function Elapsed({ since }) {
 }
 
 // ── Active Call Card ──────────────────────────────────────────────────────────
-function CallCard({ call, sources }) {
+function CallCard({ call, sources, onLock, isLocked }) {
   const color = call.emergency ? 'var(--red)' : call.encrypted ? '#c084fc' : GROUP_COLOR(call.group_tag);
   const trunk = freqToTrunk(call.freq, sources);
 
   return (
-    <div className={`call-card${call.emergency ? ' call-card--emrg' : ''}`}
-      style={{ '--card-color': color }}>
+    <div className={`call-card${call.emergency ? ' call-card--emrg' : ''}${isLocked ? ' call-card--locked' : ''}`}
+      style={{ '--card-color': color }}
+      onClick={() => onLock && onLock(call)}
+      title={isLocked ? 'Streaming — click to unlock' : 'Click to lock & stream audio'}>
       <div className="call-card__header">
         <div className="call-card__tags">
           {call.emergency && <span className="badge badge--emrg">EMRG</span>}
@@ -208,6 +210,22 @@ function Stat({ label, value, alert }) {
     <div className={`stat-box${alert ? ' stat-box--alert' : ''}`}>
       <div className="stat-box__label mono dim">{label}</div>
       <div className="stat-box__value">{value ?? '—'}</div>
+    </div>
+  );
+}
+
+// ── TG Lock bar ───────────────────────────────────────────────────────────────
+function TgLockBar({ lockedTg, queueLen, isPlaying, onStop }) {
+  return (
+    <div className="lock-bar">
+      <div className={`lock-bar__dot${isPlaying ? ' lock-bar__dot--playing' : ''}`} />
+      <span className="lock-bar__label">{lockedTg.label}</span>
+      <span className="mono dim xs">· TG {lockedTg.tgid}</span>
+      <span className="lock-bar__status mono xs">
+        {isPlaying ? '▶ PLAYING' : '● LOCKED'}
+        {queueLen > 0 && ` · ${queueLen} queued`}
+      </span>
+      <button className="lock-bar__stop" onClick={onStop}>✕ UNLOCK</button>
     </div>
   );
 }
@@ -488,7 +506,12 @@ export default function App() {
   const [units,      setUnits]      = useState([]);
   const [spark,      setSpark]      = useState([]);
   const [sysDetail,  setSysDetail]  = useState(null);
-  const [audioCallId, setAudioCallId] = useState(null);
+  const [audioCallId,   setAudioCallId]   = useState(null);
+  const [lockedTg,      setLockedTg]      = useState(null);
+  const [audioQueue,    setAudioQueue]    = useState([]);
+  const [playingLockId, setPlayingLockId] = useState(null);
+  const lockAudioRef    = useRef(null);
+  const audioUnlocked   = useRef(false);
   const [theme, setTheme] = useState(() => localStorage.getItem('jitr-theme') || 'night');
   const [fontSize, setFontSize] = useState(() => localStorage.getItem('jitr-font-size') || 'normal');
   const [scanList, setScanList] = useState(() => {
@@ -498,7 +521,8 @@ export default function App() {
   const [tgSearch,      setTgSearch]      = useState('');
   const [tgGroupFilter, setTgGroupFilter] = useState('');
   const [tgActiveOnly,  setTgActiveOnly]  = useState(true);
-  const sysidRef = useRef(sysid);
+  const sysidRef    = useRef(sysid);
+  const lockedTgRef = useRef(null);
   useEffect(() => { sysidRef.current = sysid; }, [sysid]);
 
   useEffect(() => {
@@ -514,6 +538,29 @@ export default function App() {
     setScanList(prev => { const n = new Set(prev); n.has(tgid) ? n.delete(tgid) : n.add(tgid); return n; });
   }, []);
   const clearScan = useCallback(() => setScanList(new Set()), []);
+
+  const lockTg = useCallback((call) => {
+    // Unlock browser audio on this user gesture so later .play() calls work
+    if (!audioUnlocked.current) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx.resume().then(() => ctx.close());
+        audioUnlocked.current = true;
+      } catch (_) {}
+    }
+    const lt = { sysid: call.sysid, tgid: call.tgid, label: call.alpha_tag || `TG ${call.tgid}` };
+    lockedTgRef.current = lt;
+    setLockedTg(lt);
+    setAudioQueue([]);
+    setPlayingLockId(null);
+  }, []);
+
+  const unlockTg = useCallback(() => {
+    lockedTgRef.current = null;
+    setLockedTg(null);
+    setAudioQueue([]);
+    setPlayingLockId(null);
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.fontSize = fontSize;
@@ -539,19 +586,32 @@ export default function App() {
       });
     });
 
-    socket.on('call:end', ({ sysid: sid, tgid }) => {
+    socket.on('call:end', ({ sysid: sid, tgid, call_id, has_audio }) => {
       setActive(prev => prev.filter(c => !(c.sysid === sid && c.tgid === tgid)));
       if (sysidRef.current) fetchCalls(sysidRef.current);
+      const lt = lockedTgRef.current;
+      if (lt && lt.sysid === sid && lt.tgid === tgid && has_audio && call_id) {
+        setAudioQueue(q => [...q, call_id]);
+      }
     });
 
     socket.on('calls:updated', () => {
       if (sysidRef.current) fetchCalls(sysidRef.current);
     });
 
+    // Fired by syncAudioFiles() when a file is backfilled — more reliable than
+    // call:end has_audio, since tr-plugin-mqtt often omits call_filename.
+    socket.on('call:audio', ({ sysid: sid, tgid, call_id }) => {
+      const lt = lockedTgRef.current;
+      if (lt && lt.sysid === sid && lt.tgid === tgid && call_id) {
+        setAudioQueue(q => [...q, call_id]);
+      }
+    });
+
     return () => {
       socket.off('connect'); socket.off('disconnect');
       socket.off('active:snapshot'); socket.off('call:start'); socket.off('call:end');
-      socket.off('calls:updated');
+      socket.off('calls:updated'); socket.off('call:audio');
     };
   }, []);
 
@@ -618,6 +678,23 @@ export default function App() {
     return () => clearInterval(t);
   }, [page, sysid, fetchSysDetail]);
 
+  // Drain the audio queue: start the next call as soon as the current one finishes.
+  useEffect(() => {
+    if (playingLockId === null && audioQueue.length > 0) {
+      setPlayingLockId(audioQueue[0]);
+      setAudioQueue(q => q.slice(1));
+    }
+  }, [playingLockId, audioQueue]);
+
+  // Imperatively play when playingLockId is set — more reliable than autoPlay.
+  useEffect(() => {
+    if (!playingLockId || !lockAudioRef.current) return;
+    const el = lockAudioRef.current;
+    el.src = `${API}/api/calls/${playingLockId}/audio`;
+    el.load();
+    el.play().catch(() => setPlayingLockId(null));
+  }, [playingLockId]);
+
   const sys          = systems.find(s => s.sysid === sysid);
   const emergency    = active.filter(c => c.emergency);
   const visibleActive = scanList.size > 0 ? active.filter(c => scanList.has(String(c.tgid))) : active;
@@ -650,7 +727,13 @@ export default function App() {
             <div className="scanning mono dim">— SCANNING —</div>
           ) : (
             <div className="card-grid">
-              {sortedActive.map(c => <CallCard key={`${c.sysid}-${c.tgid}`} call={c} sources={sysDetail?.sdr_sources_json} />)}
+              {sortedActive.map(c => {
+                const isLocked = lockedTg?.sysid === c.sysid && lockedTg?.tgid === c.tgid;
+                return (
+                  <CallCard key={`${c.sysid}-${c.tgid}`} call={c} sources={sysDetail?.sdr_sources_json}
+                    onLock={isLocked ? unlockTg : lockTg} isLocked={isLocked} />
+                );
+              })}
             </div>
           )}
 
@@ -765,7 +848,16 @@ export default function App() {
         theme={theme} toggleTheme={toggleTheme}
         fontSize={fontSize} cycleFontSize={cycleFontSize} />
       <SysBar systems={systems} sysid={sysid} setSysid={setSysid} />
+      {lockedTg && (
+        <TgLockBar lockedTg={lockedTg} queueLen={audioQueue.length}
+          isPlaying={!!playingLockId} onStop={unlockTg} />
+      )}
       {renderPage()}
+      {lockedTg && (
+        <audio ref={lockAudioRef} style={{ display: 'none' }}
+          onEnded={() => setPlayingLockId(null)}
+          onError={() => setPlayingLockId(null)} />
+      )}
       {audioCallId && <AudioBar callId={audioCallId} onClose={() => setAudioCallId(null)} />}
     </div>
   );
